@@ -1,59 +1,40 @@
 package com.example.keyspaceexplorer
 
-import android.annotation.SuppressLint
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.math.BigInteger
-import java.math.RoundingMode
 
 @Composable
 fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
@@ -72,6 +53,7 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     ) {
         Text("Progresso: ${(progress * 100).format(4)}%", fontSize = 18.sp)
         Text("Altura (bits): $bitLength", fontSize = 16.sp)
+        Text("Items por pagina: ${items.size}", fontSize = 14.sp)
 
         Slider(
             value = sliderValue,
@@ -82,6 +64,17 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
                 viewModel.jumpToProgress(sliderValue)
             },
             modifier = Modifier.fillMaxWidth()
+        )
+
+        val hits = items.count { it.dbHit == true }
+        val summary = if (hits == 0) "📊 Match com DB: ❌ Nenhum" else "📊 Match com DB: ✅ $hits encontrados"
+
+        Text(
+            text = summary,
+            color = if (hits > 0) Color(0xFF4CAF50) else Color.LightGray,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
 
         Spacer(Modifier.height(8.dp))
@@ -115,12 +108,39 @@ fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
+            val dbStatusEmoji = when (item.dbHit) {
+                true -> "✅"
+                false -> "❌"
+                null -> "❓"
+            }
+
+            val dbStatusColor = when (item.dbHit) {
+                true -> Color(0xFF4CAF50)
+                false -> Color.Gray
+                null -> Color.LightGray
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Index: ${item.index.toScientificNotation()}", fontWeight = FontWeight.Bold)
-                Text(text = "\uD83D\uDD11:" + "...${item.hex.takeLast(6)}")
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Index: ${item.index.toScientificNotation()}",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "\uD83D\uDD11: ...${item.hex.takeLast(6)}",
+                        fontSize = 12.sp
+                    )
+                }
+
+                Text(
+                    text = dbStatusEmoji,
+                    fontSize = 18.sp,
+                    color = dbStatusColor,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
             }
         }
     }
