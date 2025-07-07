@@ -2,6 +2,7 @@ package com.example.keyspaceexplorer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.keyspaceexplorer.AddressUtils.normalize
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,24 +23,23 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     private var currentIndex = BigInteger.ONE
 
     private val redisService = RedisService()
-    val isConnecting = redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    fun check(addresses: List<String>) {
-        viewModelScope.launch {
-            redisService.checkMatches(addresses)
-        }
-    }
+    val isConnecting =
+        redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun loadNextBatch() {
         viewModelScope.launch {
             val batchSize = MainActivity.Instance.batchSize
             val batch = repository.generateBatch(currentIndex, batchSize)
-            val matches = repository.checkMatches(batch.flatMap { it.addresses })
+
+            val allAddresses = batch.flatMap { it.addresses }
+            val matches = redisService.checkMatches(allAddresses)
 
             val updatedBatch = batch.map { item ->
-                item.apply {
-                    dbHit = addresses.any { it in matches }
+                val hasHit = item.addresses.any { addr ->
+                    normalize(addr.address, addr.token) in matches
                 }
+                item.dbHit = hasHit
+                item
             }
 
             val found = updatedBatch.filter { it.dbHit == true }

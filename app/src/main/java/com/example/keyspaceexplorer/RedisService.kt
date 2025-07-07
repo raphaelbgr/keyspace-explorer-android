@@ -29,8 +29,9 @@ class RedisService {
     private val _isConnecting = MutableStateFlow(false)
     val isConnecting: StateFlow<Boolean> = _isConnecting.asStateFlow()
 
-    suspend fun checkMatches(addresses: List<String>): List<String> {
-        val json = JSONObject().put("addresses", JSONArray(addresses))
+    suspend fun checkMatches(addresses: List<CryptoAddress>): List<String> {
+        val normalized = addresses.map { AddressUtils.normalize(it.address, it.token) }
+        val json = JSONObject().put("addresses", JSONArray(normalized))
         val body = json.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder().url(url).post(body).build()
 

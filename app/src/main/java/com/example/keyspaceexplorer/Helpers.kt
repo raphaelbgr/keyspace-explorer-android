@@ -9,7 +9,10 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.bitcoinj.core.Base58
+import org.bouncycastle.crypto.digests.RIPEMD160Digest
 import java.io.IOException
+import java.security.MessageDigest
 
 object AlertHelper {
     fun alertMatch(item: PrivateKeyItem) {
@@ -49,5 +52,40 @@ object StorageHelper {
         val existing = prefs.getStringSet("matches", mutableSetOf()) ?: mutableSetOf()
         existing.add("${item.hex}|${item.addresses.joinToString()}")
         prefs.edit().putStringSet("matches", existing).apply()
+    }
+}
+
+object AddressUtils {
+
+    fun pubKeyToAddress(pubKey: ByteArray): String {
+        // 1. SHA-256
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(pubKey)
+
+        // 2. RIPEMD-160
+        val ripemd160 = RIPEMD160Digest().apply { update(sha256, 0, sha256.size) }
+        val hash160 = ByteArray(20)
+        ripemd160.doFinal(hash160, 0)
+
+        // 3. Prefix (0x00 para BTC mainnet P2PKH)
+        val prefix = byteArrayOf(0x00)
+
+        // 4. Payload
+        val payload = prefix + hash160
+
+        // 5. Checksum = SHA256(SHA256(payload)).take(4)
+        val checksum = MessageDigest.getInstance("SHA-256").digest(
+            MessageDigest.getInstance("SHA-256").digest(payload)
+        ).take(4).toByteArray()
+
+        // 6. Base58(Payload + Checksum)
+        return Base58.encode(payload + checksum)
+    }
+
+    fun normalize(address: String, coin: String): String {
+        return when (coin.uppercase()) {
+            "ETH" -> address.lowercase().removePrefix("0x")
+            "BCH" -> address.removePrefix("bitcoincash:")
+            else -> address
+        }
     }
 }

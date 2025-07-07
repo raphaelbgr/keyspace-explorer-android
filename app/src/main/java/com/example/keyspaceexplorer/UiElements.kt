@@ -14,13 +14,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -124,13 +128,25 @@ fun KeyDetailDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clipboardManager =
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val scope = rememberCoroutineScope()
-    var dbStatus by remember { mutableStateOf(if (existsInDb == null)"❓ Não verificado" else if (existsInDb) "✅ Existente" else "❌ Não existente") }
+
+    var dbStatus by remember {
+        mutableStateOf(
+            when (existsInDb) {
+                null -> "❓ Não verificado"
+                true -> "✅ Existente"
+                false -> "❌ Não existente"
+            }
+        )
+    }
 
     val batchSize = MainActivity.Instance.batchSize
     val index = item.index
-    val pageNumber = index.toBigDecimal().divide(batchSize.toBigDecimal(), 0, RoundingMode.FLOOR).toBigInteger()
+    val pageNumber =
+        index.toBigDecimal().divide(batchSize.toBigDecimal(), 0, RoundingMode.FLOOR)
+            .toBigInteger()
     val bitLength = index.bitLength()
 
     val fullText = buildString {
@@ -141,16 +157,60 @@ fun KeyDetailDialog(
         appendLine("🔑 Chave Privada (hex): ${item.hex}")
         appendLine("🗃️ Consulta no DB: $dbStatus")
         item.addresses.forEach {
-            appendLine("📬 Address: $it")
+            appendLine("📬 [${it.token} - ${it.variant}] ${it.address}")
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("🔍 Detalhes da Chave") },
+        title = {
+            Text("🔍 Detalhes da Chave", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        },
         text = {
-            Column {
-                Text(fullText)
+            Column(modifier = Modifier.heightIn(min = 200.dp, max = 450.dp)) {
+                Text("📄 Informações Gerais", fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("🔢 Index: $index")
+                Text("📄 Página: $pageNumber")
+                Text("📦 Tamanho da Página: $batchSize")
+                Text("📏 Bits: $bitLength")
+                Text("🔑 Chave Privada: ${item.hex}")
+                Text("🗃️ Consulta no DB: $dbStatus")
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("📬 Endereços Derivados", fontWeight = FontWeight.SemiBold)
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 250.dp)
+                        .padding(top = 8.dp)
+                ) {
+                    items(item.addresses) { addr ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            elevation = CardDefaults.cardElevation(2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Text(
+                                    text = if (addr.variantPretty().isNotEmpty()) "[${addr.token}//${addr.variantPretty()}]"
+                                        else "[${addr.token}]",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = addr.address,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp
+                                )
+//                                Spacer(modifier = Modifier.height(2.dp))
+
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -163,15 +223,21 @@ fun KeyDetailDialog(
                 TextButton(onClick = {
                     val clip = ClipData.newPlainText("Key Info", fullText)
                     clipboardManager.setPrimaryClip(clip)
-                    Toast.makeText(context, "Copiado para a área de transferência", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Copiado para a área de transferência",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }) {
-                    Text("📋 Copiar")
+                    Text("📋 Copiar Tudo")
                 }
+
                 TextButton(onClick = {
                     scope.launch {
                         dbStatus = "⏳ Consultando..."
                         val matches = RedisService().checkMatches(item.addresses)
-                        dbStatus = if (matches.isNotEmpty()) "✅ Existente" else "❌ Não existente"
+                        dbStatus =
+                            if (matches.isNotEmpty()) "✅ Existente" else "❌ Não existente"
                     }
                 }) {
                     Text("🔍 Verificar no DB")
@@ -217,16 +283,62 @@ fun ConnectionStatusIndicator(isConnecting: Boolean) {
 
 fun Double.format(digits: Int) = "% .${digits}f".format(this)
 
+@Preview(showBackground = false)
+@Composable
+fun PreviewKeyDetailDialog() {
+    val item = PrivateKeyItem(
+        index = BigInteger.ONE,
+        hex = "0000000000000000000000000000000000000000000000000000000000000001",
+        addresses = listOf(
+            CryptoAddress(
+                token = "BTC",
+                variant = "P2PKH",
+                address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            ),
+            CryptoAddress(
+                token = "BTC",
+                variant = "Bech32",
+                address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+            ),
+            CryptoAddress(
+                token = "ETH",
+                variant = "ETH",
+                address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+            )
+        )
+    )
+
+    MaterialTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            KeyDetailDialog(
+                item = item,
+                existsInDb = true,
+                onDismiss = {}
+            )
+        }
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun PreviewKeyItemCard() {
     val sampleItem = PrivateKeyItem(
-        index = BigInteger("123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
+        index = BigInteger("12345678901234567890"),
         hex = "0000000000000000000000000000000000000000000000000000000000000001",
         addresses = listOf(
-            "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-            "1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
-        )
+            CryptoAddress(
+                token = "BTC",
+                variant = "P2PKH",
+                address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            ),
+            CryptoAddress(
+                token = "BTC",
+                variant = "P2SH",
+                address = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+            )
+        ),
+        dbHit = true
     )
-    KeyItemCard(sampleItem)
+
+    KeyItemCard(item = sampleItem, onClick = {})
 }
