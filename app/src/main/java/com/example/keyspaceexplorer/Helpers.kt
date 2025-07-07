@@ -2,6 +2,8 @@ package com.example.keyspaceexplorer
 
 import android.annotation.SuppressLint
 import android.preference.PreferenceManager
+import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import okhttp3.Call
 import okhttp3.Callback
@@ -16,13 +18,16 @@ import java.security.MessageDigest
 
 object AlertHelper {
     fun alertMatch(item: PrivateKeyItem) {
-        // Assume contexto via Compose ou Fragment
-        MainActivity.Instance.context?.application?.let {
-            AlertDialog.Builder(it).apply {
-                setTitle("Match encontrado!")
-                setMessage("PrivKey: ${item.hex}\nAddress: ${item.addresses.joinToString()}")
-                setPositiveButton("OK", null)
-            }.show()
+        try {
+            MainActivity.Instance.context?.application?.let {
+                AlertDialog.Builder(it).apply {
+                    setTitle("Match encontrado!")
+                    setMessage("PrivKey: ${item.hex}\nAddress: ${item.addresses.joinToString()}")
+                    setPositiveButton("OK", null)
+                }.show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
@@ -32,26 +37,56 @@ object TelegramHelper {
     private const val TELEGRAM_ID = "27196478"
 
     fun sendAlert(item: PrivateKeyItem) {
-        val body = "Chave privada encontrada!\nPrivKey: ${item.hex}\nAddress: ${item.addresses.joinToString()}"
-        val form = FormBody.Builder()
-            .add("chat_id", TELEGRAM_ID)
-            .add("text", body)
-            .build()
-        val request = Request.Builder().url(TELEGRAM_URL).post(form).build()
-        OkHttpClient().newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {}
-            override fun onResponse(call: Call, response: Response) {}
-        })
+        try {
+            val body = "Chave privada encontrada!\nPrivKey: ${item.hex}\nAddress: ${item.addresses.joinToString()}"
+            val form = FormBody.Builder()
+                .add("chat_id", TELEGRAM_ID)
+                .add("text", body)
+                .build()
+            val request = Request.Builder().url(TELEGRAM_URL).post(form).build()
+            OkHttpClient().newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {}
+                override fun onResponse(call: Call, response: Response) {}
+            })
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 
 object StorageHelper {
     @SuppressLint("MutatingSharedPrefs", "UseKtx")
     fun saveMatch(item: PrivateKeyItem) {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.Instance.context)
-        val existing = prefs.getStringSet("matches", mutableSetOf()) ?: mutableSetOf()
-        existing.add("${item.hex}|${item.addresses.joinToString()}")
-        prefs.edit().putStringSet("matches", existing).apply()
+        try {
+            val prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.Instance.context)
+            val existing = prefs.getStringSet("matches", mutableSetOf()) ?: mutableSetOf()
+            existing.add("${item.hex}|${item.addresses.joinToString()}")
+            prefs.edit().putStringSet("matches", existing).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
+
+object LogHelper {
+    fun logMatch(item: PrivateKeyItem) {
+        try {
+            for (i in 1..100) {
+                Log.d("MATCH", "MATCH FOUND -> $item")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
+
+object ToastHelper {
+    fun showToast(item: PrivateKeyItem) {
+        try {
+            Toast.makeText(MainActivity.Instance.context, "Match encontrado! -> $item", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 

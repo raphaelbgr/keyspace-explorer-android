@@ -1,5 +1,6 @@
 package com.example.keyspaceexplorer
 
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -8,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,11 +18,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -57,6 +63,7 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var selectedItem by remember { mutableStateOf<PrivateKeyItem?>(null) }
 
     var sliderValue by remember { mutableFloatStateOf(progress.toFloat()) }
+    var loading by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -85,17 +92,15 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             }
         }
 
-        LaunchedEffect(items) {
-            if (items.size < MainActivity.Instance.batchSize * 3) {
-                viewModel.loadNextBatch()
-            }
-        }
-
         selectedItem?.let {
             KeyDetailDialog(
                 item = it,
                 existsInDb = it.dbHit
             ) { selectedItem = null }
+        }
+
+        if (loading) {
+            LoadingView()
         }
     }
 }
@@ -121,6 +126,7 @@ fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
     }
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun KeyDetailDialog(
     item: PrivateKeyItem,
@@ -128,8 +134,7 @@ fun KeyDetailDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val clipboardManager =
-        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val scope = rememberCoroutineScope()
 
     var dbStatus by remember {
@@ -144,9 +149,7 @@ fun KeyDetailDialog(
 
     val batchSize = MainActivity.Instance.batchSize
     val index = item.index
-    val pageNumber =
-        index.toBigDecimal().divide(batchSize.toBigDecimal(), 0, RoundingMode.FLOOR)
-            .toBigInteger()
+    val pageNumber = index.toBigDecimal().divide(batchSize.toBigDecimal(), 0, RoundingMode.FLOOR).toBigInteger()
     val bitLength = index.bitLength()
 
     val fullText = buildString {
@@ -167,25 +170,22 @@ fun KeyDetailDialog(
             Text("🔍 Detalhes da Chave", fontWeight = FontWeight.Bold, fontSize = 20.sp)
         },
         text = {
-            Column(modifier = Modifier.heightIn(min = 200.dp, max = 450.dp)) {
-                Text("📄 Informações Gerais", fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("🔢 Index: $index")
-                Text("📄 Página: $pageNumber")
-                Text("📦 Tamanho da Página: $batchSize")
-                Text("📏 Bits: $bitLength")
-                Text("🔑 Chave Privada: ${item.hex}")
-                Text("🗃️ Consulta no DB: $dbStatus")
+            BoxWithConstraints(modifier = Modifier.heightIn(min = 300.dp, max = 500.dp)) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    item {
+                        Text("📄 Informações Gerais", fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("🔢 Index: $index")
+                        Text("📄 Página: $pageNumber")
+                        Text("📦 Tamanho da Página: $batchSize")
+                        Text("📏 Bits: $bitLength")
+                        Text("🔑 Chave Privada: ${item.hex}")
+                        Text("🗃️ Consulta no DB: $dbStatus")
 
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("📬 Endereços Derivados", fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("📬 Endereços Derivados", fontWeight = FontWeight.SemiBold)
+                    }
 
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 100.dp, max = 250.dp)
-                        .padding(top = 8.dp)
-                ) {
                     items(item.addresses) { addr ->
                         Card(
                             modifier = Modifier
@@ -195,8 +195,7 @@ fun KeyDetailDialog(
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text(
-                                    text = if (addr.variantPretty().isNotEmpty()) "[${addr.token}//${addr.variantPretty()}]"
-                                        else "[${addr.token}]",
+                                    text = if (addr.variantPretty().isNotEmpty()) "[${addr.token}//${addr.variantPretty()}]" else "[${addr.token}]",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 10.sp
                                 )
@@ -205,8 +204,6 @@ fun KeyDetailDialog(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 10.sp
                                 )
-//                                Spacer(modifier = Modifier.height(2.dp))
-
                             }
                         }
                     }
@@ -223,11 +220,7 @@ fun KeyDetailDialog(
                 TextButton(onClick = {
                     val clip = ClipData.newPlainText("Key Info", fullText)
                     clipboardManager.setPrimaryClip(clip)
-                    Toast.makeText(
-                        context,
-                        "Copiado para a área de transferência",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(context, "Copiado para a área de transferência", Toast.LENGTH_SHORT).show()
                 }) {
                     Text("📋 Copiar Tudo")
                 }
@@ -236,8 +229,7 @@ fun KeyDetailDialog(
                     scope.launch {
                         dbStatus = "⏳ Consultando..."
                         val matches = RedisService().checkMatches(item.addresses)
-                        dbStatus =
-                            if (matches.isNotEmpty()) "✅ Existente" else "❌ Não existente"
+                        dbStatus = if (matches.isNotEmpty()) "✅ Existente" else "❌ Não existente"
                     }
                 }) {
                     Text("🔍 Verificar no DB")
@@ -261,6 +253,29 @@ fun Int.toSuperscript(): String {
         '8' to '⁸', '9' to '⁹'
     )
     return this.toString().map { map[it] ?: it }.joinToString("")
+}
+
+@Composable
+fun LoadingView(modifier: Modifier = Modifier) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(
+                strokeWidth = 4.dp,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Carregando...",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+    }
 }
 
 @Composable

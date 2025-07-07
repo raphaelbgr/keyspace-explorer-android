@@ -1,5 +1,6 @@
 package com.example.keyspaceexplorer
 
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.keyspaceexplorer.AddressUtils.normalize
@@ -17,6 +18,9 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     private val _progress = MutableStateFlow(0.0)
     val progress: StateFlow<Double> = _progress
 
+    private val _loading = MutableStateFlow(false)
+    val loading: StateFlow<Boolean> = _loading
+
     private val _bitLength = MutableStateFlow(0)
     val bitLength: StateFlow<Int> = _bitLength
 
@@ -26,34 +30,49 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     val isConnecting =
         redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    fun loadNextBatch() {
+    init {
+        loadNextBatch()
+    }
+
+    private fun loadNextBatch() {
         viewModelScope.launch {
-            val batchSize = MainActivity.Instance.batchSize
-            val batch = repository.generateBatch(currentIndex, batchSize)
+            try {
+                if (_loading.value) return@launch
+                _loading.value = true
 
-            val allAddresses = batch.flatMap { it.addresses }
-            val matches = redisService.checkMatches(allAddresses)
+                val batchSize = MainActivity.Instance.batchSize
+                val batch = repository.generateBatch(currentIndex, batchSize)
 
-            val updatedBatch = batch.map { item ->
-                val hasHit = item.addresses.any { addr ->
-                    normalize(addr.address, addr.token) in matches
+                val allAddresses = batch.flatMap { it.addresses }
+                val matches = redisService.checkMatches(allAddresses)
+
+                val updatedBatch = batch.map { item ->
+                    val hasHit = item.addresses.any { addr ->
+                        normalize(addr.address, addr.token) in matches
+                    }
+                    item.dbHit = hasHit
+                    item
                 }
-                item.dbHit = hasHit
-                item
+
+                val found = updatedBatch.filter { it.dbHit == true }
+                found.forEach {
+                    AlertHelper.alertMatch(it)
+                    StorageHelper.saveMatch(it)
+                    TelegramHelper.sendAlert(it)
+                    LogHelper.logMatch(it)
+                    ToastHelper.showToast(it)
+                }
+
+                _items.value = (_items.value + updatedBatch).takeLast(batchSize * 3)
+                currentIndex += BigInteger.valueOf(batchSize.toLong())
+
+                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
+                _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _loading.value = false
             }
-
-            val found = updatedBatch.filter { it.dbHit == true }
-            found.forEach {
-                AlertHelper.alertMatch(it)
-                StorageHelper.saveMatch(it)
-                TelegramHelper.sendAlert(it)
-            }
-
-            _items.value = (_items.value + updatedBatch).takeLast(batchSize * 3)
-            currentIndex += BigInteger.valueOf(batchSize.toLong())
-
-            _progress.value = BitcoinUtils.calculateProgress(currentIndex)
-            _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
         }
     }
 

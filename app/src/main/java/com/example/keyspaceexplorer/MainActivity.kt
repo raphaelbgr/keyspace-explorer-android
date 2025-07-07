@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
         Instance.context = this
         super.onCreate(savedInstanceState)
         setContent {
-            KeyspaceExplorerTheme (darkTheme = true) {
+            KeyspaceExplorerTheme (darkTheme = false) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
