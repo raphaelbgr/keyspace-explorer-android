@@ -1,11 +1,12 @@
 package com.example.keyspaceexplorer
 
 import org.bitcoinj.core.Base58
-import org.bouncycastle.crypto.digests.RIPEMD160Digest
-import java.math.BigInteger
-import java.security.MessageDigest
 import org.bitcoinj.core.ECKey
 import org.bitcoinj.params.MainNetParams
+import org.bouncycastle.crypto.digests.RIPEMD160Digest
+import org.bouncycastle.jcajce.provider.digest.Keccak
+import java.math.BigInteger
+import java.security.MessageDigest
 
 object LegacyUncompressedUtils {
 
@@ -79,7 +80,7 @@ object BipDeriverHelper {
                 "0x" + run {
                     val uncompressedPubKey = key.decompress().pubKey
                     val pubKeyNoPrefix = uncompressedPubKey.copyOfRange(1, uncompressedPubKey.size) // remove 0x04 prefix
-                    val digest = MessageDigest.getInstance("KECCAK-256").digest(pubKeyNoPrefix)
+                    val digest = Keccak.Digest256().digest(pubKeyNoPrefix)
                     digest.takeLast(20).joinToString("") { "%02x".format(it) }
                 }
             }
