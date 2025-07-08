@@ -2,6 +2,9 @@ package com.example.keyspaceexplorer
 
 import org.bitcoinj.core.Base58
 import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.LegacyAddress
+import org.bitcoinj.crypto.HDKeyDerivation
+import org.bitcoinj.crypto.HDUtils
 import org.bitcoinj.params.MainNetParams
 import org.bouncycastle.crypto.digests.RIPEMD160Digest
 import org.bouncycastle.jcajce.provider.digest.Keccak
@@ -69,22 +72,34 @@ enum class DerivationType { BIP44, BIP49, BIP84, BIP86 }
 
 object BipDeriverHelper {
     fun deriveFromHex(hex: String, coinType: String, type: DerivationType): String {
-        // Você pode usar bitcoinj ou derivação real BIP com seed se quiser
-        val key = ECKey.fromPrivate(BigInteger(hex, 16))
         return when (coinType) {
-            "BITCOIN", "LITECOIN", "DOGECOIN", "DASH", "ZCASH", "BITCOIN_CASH" -> {
-                // Simplesmente gera um endereço legado (P2PKH) como placeholder
-                org.bitcoinj.core.LegacyAddress.fromKey(MainNetParams.get(), key).toString()
+            Bip44Coins.ETHEREUM -> {
+                val key = ECKey.fromPrivate(BigInteger(hex, 16)).decompress()
+                val pubKey = key.pubKey.copyOfRange(1, key.pubKey.size)
+                val digest = Keccak.Digest256().digest(pubKey)
+                "0x" + digest.takeLast(20).joinToString("") { "%02x".format(it) }
             }
-            "ETHEREUM" -> {
-                "0x" + run {
-                    val uncompressedPubKey = key.decompress().pubKey
-                    val pubKeyNoPrefix = uncompressedPubKey.copyOfRange(1, uncompressedPubKey.size) // remove 0x04 prefix
-                    val digest = Keccak.Digest256().digest(pubKeyNoPrefix)
-                    digest.takeLast(20).joinToString("") { "%02x".format(it) }
+            else -> {
+                val seed = hexToSeed(hex)
+                val rootKey = HDKeyDerivation.createMasterPrivateKey(seed)
+                val path = when (type) {
+                    DerivationType.BIP44 -> "44H/0H/0H/0/0"
+                    DerivationType.BIP49 -> "49H/0H/0H/0/0"
+                    DerivationType.BIP84 -> "84H/0H/0H/0/0"
+                    DerivationType.BIP86 -> "86H/0H/0H/0/0"
                 }
+                val childKey = HDUtils.parsePath(path).fold(rootKey) { key, child ->
+                    HDKeyDerivation.deriveChildKey(key, child)
+                }
+                LegacyAddress.fromKey(MainNetParams.get(), childKey).toString()
             }
-            else -> "unknown"
+        }
+    }
+
+    private fun hexToSeed(hex: String): ByteArray {
+        val paddedHex = hex.padStart(64, '0')
+        return BigInteger(paddedHex, 16).toByteArray().let {
+            if (it.size < 64) ByteArray(64 - it.size) + it else it
         }
     }
 }
