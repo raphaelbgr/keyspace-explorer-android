@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 import java.math.BigInteger
+import java.math.RoundingMode
 
 class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel() {
     private val _items = MutableStateFlow<List<PrivateKeyItem>>(emptyList())
@@ -25,6 +27,10 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
 
     private var currentIndex = BigInteger.ONE
 
+    // Intervalo configurável do keyspace
+    private var rangeStart: BigInteger = BitcoinUtils.MIN_KEYSPACE
+    private var rangeEnd: BigInteger = BitcoinUtils.MAX_KEYSPACE
+
     private val _scannedAddressesCount = MutableStateFlow(0)
     val scannedAddressesCount: StateFlow<Int> = _scannedAddressesCount
 
@@ -32,14 +38,45 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     val isConnecting =
         redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    // Os campos públicos antigos não são mais necessários, agora são privados acima
+
     init {
         loadNextBatch()
     }
 
+    fun updateKeyspaceRange(start: BigInteger, end: BigInteger) {
+        rangeStart = start
+        rangeEnd = end
+        currentIndex = rangeStart
+        _items.value = emptyList()
+        loadNextBatch()
+    }
+
+    private fun progressInRange(progress: Float): BigInteger {
+        val percent = progress.toBigDecimal()
+        val range = rangeEnd - rangeStart
+        return rangeStart + (range.toBigDecimal().multiply(percent)).toBigInteger()
+    }
+
     private fun generateBatch(): List<PrivateKeyItem> {
         val batchSize = MainActivity.Instance.batchSize
-        val batch = repository.generateBatch(currentIndex, batchSize)
-        currentIndex += BigInteger.valueOf(batchSize.toLong())
+
+        if (currentIndex < rangeStart) {
+            currentIndex = rangeStart
+        }
+
+        if (currentIndex >= rangeEnd) {
+            // Volta para a última página válida possível dentro do range
+            currentIndex = (rangeEnd - BigInteger.ONE).subtract(BigInteger.valueOf(batchSize.toLong() - 1))
+                .coerceAtLeast(rangeStart)
+        }
+
+        val upperLimit = (currentIndex + BigInteger.valueOf(batchSize.toLong())).coerceAtMost(rangeEnd)
+        val actualBatchSize = (upperLimit - currentIndex).toInt()
+        if (actualBatchSize <= 0) return emptyList()
+
+        val batch = repository.generateBatch(currentIndex, actualBatchSize)
+        currentIndex += BigInteger.valueOf(actualBatchSize.toLong())
         return batch
     }
 
@@ -116,34 +153,41 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         }
     }
 
-    fun slideToProgress(progress: Float) {
+    fun slideToProgressInRange(normalizedProgress: Float) {
         viewModelScope.launch {
-            val target = repository.progressToIndex(progress.toDouble())
-            currentIndex = target
+            val newIndex = progressInRange(normalizedProgress)
+            currentIndex = newIndex
             _items.value = emptyList()
             loadSilentNextBatch()
         }
     }
 
-    fun jumpToProgress(progress: Float) {
+    fun jumpToProgressInRange(normalizedProgress: Float) {
         viewModelScope.launch {
-            val target = repository.progressToIndex(progress.toDouble())
-            currentIndex = target
+            val newIndex = progressInRange(normalizedProgress)
+            currentIndex = newIndex
             _items.value = emptyList()
             loadNextBatch()
         }
     }
 
     fun estimatePage(progress: Float): BigInteger {
-        val bitLen = bitLength.value  // ou item.index.bitLength() se for o caso
-        val totalKeys = BigInteger.valueOf(2).pow(bitLen)
-
-        return (totalKeys.toBigDecimal() * progress.toBigDecimal())
+        val totalKeys = rangeEnd - rangeStart
+        return (totalKeys.toBigDecimal().multiply(progress.toBigDecimal()))
+            .divide(BigDecimal.valueOf(MainActivity.Instance.batchSize.toLong()), RoundingMode.HALF_UP)
             .toBigInteger()
-            .divide(BigInteger.valueOf(MainActivity.Instance.batchSize.toLong()))
     }
 
     fun setLoading(loading: Boolean) {
         _loading.value = loading
+    }
+
+    fun calculateRelativeProgress(): Double {
+        val range = rangeEnd - rangeStart
+        if (range == BigInteger.ZERO) return 0.0
+        val position = currentIndex - rangeStart
+        return position.toBigDecimal()
+            .divide(range.toBigDecimal(), 10, java.math.RoundingMode.HALF_UP)
+            .toDouble()
     }
 }

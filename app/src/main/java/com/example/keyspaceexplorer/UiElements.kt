@@ -20,12 +20,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,7 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.math.BigDecimal
 import java.math.BigInteger
+import java.math.MathContext
 
 @Composable
 fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
@@ -48,11 +50,17 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
 
     var showMatches by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<PrivateKeyItem?>(null) }
-    var sliderValue by remember { mutableFloatStateOf(progress.toFloat()) }
+    var sliderValueDecimal by remember { mutableStateOf(BigDecimal.ZERO) }
     var expandedPage by remember { mutableStateOf(false) }
-    var scanOnDrag by remember { mutableStateOf(true) }
+    var scanOnDrag by remember { mutableStateOf(false) }
 
-    val estimatedPage = viewModel.estimatePage(sliderValue) // você deve implementar isso no ViewModel
+    // aumenta a precisão
+    val mathContext = MathContext(100)
+    // RangeSlider states
+    var rangeStartSlider by remember { mutableStateOf(BigDecimal.ZERO) }
+    var rangeEndSlider by remember { mutableStateOf(BigDecimal.ONE) }
+
+    val estimatedPage = viewModel.estimatePage(sliderValueDecimal.toFloat()) // você deve implementar isso no ViewModel
     val fullPageString = estimatedPage.toString()
     val displayPage = if (!expandedPage && fullPageString.length > 6) {
         fullPageString.take(6) + "..."
@@ -65,7 +73,29 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text("Progresso: ${(progress * 100).format(4)}%", fontSize = 18.sp)
+        // RangeSlider UI
+        Text(
+            text = "Range: ${rangeStartSlider.setScale(10, BigDecimal.ROUND_HALF_UP)} - ${rangeEndSlider.setScale(10, BigDecimal.ROUND_HALF_UP)}",
+            fontSize = 12.sp
+        )
+        RangeSlider(
+            value = rangeStartSlider.toFloat()..rangeEndSlider.toFloat(),
+            onValueChange = { range ->
+                rangeStartSlider = range.start.toBigDecimal(mathContext)
+                rangeEndSlider = range.endInclusive.toBigDecimal(mathContext)
+            },
+            onValueChangeFinished = {
+                val rangeSize = BitcoinUtils.MAX_KEYSPACE.subtract(BitcoinUtils.MIN_KEYSPACE)
+                val start = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal().multiply(rangeStartSlider, mathContext).toBigInteger()
+                val end = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal().multiply(rangeEndSlider, mathContext).toBigInteger()
+                viewModel.updateKeyspaceRange(start, end)
+            },
+            steps = 1000,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        val rangeProgress = viewModel.calculateRelativeProgress()
+        Text("Progresso no range: ${(rangeProgress * 100).format(4)}%", fontSize = 18.sp)
         Text("Altura (bits): $bitLength", fontSize = 16.sp)
         Text("Items por pagina: ${items.size}", fontSize = 14.sp)
 
@@ -133,18 +163,27 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             }
         }
 
+        val sliderNormalized = sliderValueDecimal
+            .minus(rangeStartSlider)
+            .divide(rangeEndSlider.minus(rangeStartSlider).takeIf { it > BigDecimal.ZERO } ?: BigDecimal.ONE, mathContext)
+            .coerceIn(BigDecimal.ZERO, BigDecimal.ONE)
+
         Slider(
-            value = sliderValue,
+            value = sliderNormalized.toFloat(),
             onValueChange = {
-                sliderValue = it
+                val newDecimal = rangeStartSlider + (rangeEndSlider - rangeStartSlider)
+                    .multiply(it.toBigDecimal(mathContext), mathContext)
+
+                sliderValueDecimal = newDecimal
+
                 if (scanOnDrag) {
                     viewModel.setLoading(true)
-                    viewModel.slideToProgress(sliderValue)
+                    viewModel.slideToProgressInRange(sliderNormalized.toFloat())
                 }
             },
             onValueChangeFinished = {
                 viewModel.setLoading(false)
-                viewModel.jumpToProgress(sliderValue)
+                viewModel.jumpToProgressInRange(sliderNormalized.toFloat())
             },
             modifier = Modifier.fillMaxWidth()
         )
