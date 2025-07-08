@@ -22,6 +22,12 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
 //    private val _progress = MutableStateFlow(0.0)
 //    val progress: StateFlow<Double> = _progress
 
+    private val _currentBackgroundScanCount = MutableStateFlow(0)
+    val currentBackgroundScanCount: StateFlow<Int> = _currentBackgroundScanCount
+
+    private val _totalBackgroundToScan = MutableStateFlow(0)
+    val totalBackgroundToScan: StateFlow<Int> = _totalBackgroundToScan
+
     private val _summary = MutableStateFlow("📊 Match com DB: ❌ Nenhum")
     val summary: StateFlow<String> = _summary
 
@@ -110,17 +116,22 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         val allAddresses = batch.flatMap { it.addresses }
         allAddresses.map { it.address = normalizeAddress(it.address, it.token) }
 
+
         // Obtem os endereços normalizados que deram match
         val matchedSet = redisService.checkMatches(allAddresses)
 
+        // Background
+        _currentBackgroundScanCount.value += allAddresses.size
+
         // Atualiza cada item com matched e dbHit
-        val updatedBatch = batch.map { item ->
+        val updatedBatch = mutableListOf<PrivateKeyItem>()
+        for ((index, item) in batch.withIndex()) {
             val matched = item.addresses.filter {
                 normalizeAddress(it.address, it.token) in matchedSet
             }
             item.dbHit = matched.isNotEmpty()
             item.matched = matched
-            item
+            updatedBatch += item
         }
 
         // Executa alertas e persistência para os que tiveram hit
@@ -148,9 +159,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
             try {
                 val batch = generateBatch()
                 checkMatches(batch)
-
-//                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
-//                _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -166,8 +174,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
                 val batch = generateBatch()
                 val updatedBatch = checkMatches(batch)
 
-//                val batchSize = MainActivity.Instance.batchSize
-//                _items.value = (_items.value + updatedBatch).takeLast(batchSize)
                 _items.value = updatedBatch
 
                 val hits = _items.value.count { it.dbHit == true }
@@ -177,7 +183,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
                     "📊 Match com DB: ✅ $hits encontrados"
                 }
 
-//                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
                 _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -191,31 +196,23 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     fun processSlideQueue() {
         viewModelScope.launch(Dispatchers.IO) {
             val queueSnapshot: List<Float>
-
             synchronized(slideQueue) {
                 queueSnapshot = slideQueue.toList()
                 slideQueue.clear()
             }
 
             for (progress in queueSnapshot) {
-//                val newIndex = progressInRange(progress)
-//                currentIndex = newIndex
-//                _items.value = emptyList()
                 loadSilentNextBatch()
             }
         }
     }
 
     fun slideToProgressInRange(normalizedProgress: Float) {
-//        viewModelScope.launch {
-//            val newIndex = progressInRange(normalizedProgress)
-//            currentIndex = newIndex
-//            _items.value = emptyList()
-//            loadSilentNextBatch()
-//        }
-//        slideChannel.trySend(normalizedProgress)
         synchronized(slideQueue) {
             slideQueue.add(normalizedProgress)
+            // Background
+            _totalBackgroundToScan.value = slideQueue.size * MainActivity.Instance.batchSize * 17
+            _currentBackgroundScanCount.value = 0
         }
     }
 
@@ -224,7 +221,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         viewModelScope.launch {
             val newIndex = progressInRange(normalizedProgress)
             currentIndex = newIndex
-//            _items.value = emptyList()
             loadNextBatch()
         }
     }

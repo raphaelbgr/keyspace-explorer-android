@@ -56,6 +56,10 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var showScaleDialog by remember { mutableStateOf(false) }
     val summary by viewModel.summary.collectAsState()
 
+    // Background
+    val currentScan by viewModel.currentBackgroundScanCount.collectAsState()
+    val totalToScan by viewModel.totalBackgroundToScan.collectAsState()
+
     // aumenta a precisão
     val mathContext = MathContext(100)
     // RangeSlider states
@@ -143,6 +147,19 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
                     text = "🔍 Endereços escaneados:",
                     fontSize = 12.sp,
                 )
+                // Background
+                if (totalToScan > 0) {
+                    val done = currentScan >= totalToScan
+                    val statusEmoji = if (done) "✅" else "⏳"
+                    val statusText = if (done) "Escaneamento concluído: $currentScan endereços escaneados" else "Escaneando em background: $currentScan de $totalToScan endereços..."
+
+                    Text(
+                        text = "$statusEmoji $statusText",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
             Box(
                 modifier = Modifier
