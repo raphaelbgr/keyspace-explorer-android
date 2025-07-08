@@ -44,10 +44,19 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         loadNextBatch()
     }
 
-    fun updateKeyspaceRange(start: BigInteger, end: BigInteger) {
+    fun updateKeyspaceRange(start: BigInteger, end: BigInteger, retainProgress: Boolean = true) {
+        val previousProgress = if (retainProgress) calculateRelativeProgress().toBigDecimal() else BigDecimal.ZERO
+
         rangeStart = start
         rangeEnd = end
-        currentIndex = rangeStart
+
+        currentIndex = if (retainProgress) {
+            val range = rangeEnd - rangeStart
+            rangeStart + (range.toBigDecimal().multiply(previousProgress)).toBigInteger()
+        } else {
+            rangeStart
+        }
+
         _items.value = emptyList()
         loadNextBatch()
     }
