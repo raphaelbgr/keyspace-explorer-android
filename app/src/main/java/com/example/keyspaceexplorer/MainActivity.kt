@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,6 +64,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun dispatchGenericMotionEvent(ev: MotionEvent?): Boolean {
+        if (ev?.action == MotionEvent.ACTION_HOVER_MOVE ||
+            ev?.action == MotionEvent.ACTION_HOVER_ENTER ||
+            ev?.action == MotionEvent.ACTION_HOVER_EXIT) {
+            return true // ignora
+        }
+        return super.dispatchGenericMotionEvent(ev)
     }
 }
 

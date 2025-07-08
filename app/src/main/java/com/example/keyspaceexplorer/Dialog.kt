@@ -361,7 +361,7 @@ fun ScaleDialog(
     onApply: (minBits: Int, maxBits: Int) -> Unit,
     onCancel: () -> Unit
 ) {
-    val bitOptions = (8..256 step 8).toList()
+    val bitOptions = listOf(0) + (8..256 step 8)
     var selectedMin by remember { mutableStateOf(8) }
     var selectedMax by remember { mutableStateOf(256) }
 
@@ -373,7 +373,9 @@ fun ScaleDialog(
                 modifier = Modifier
                     .padding(8.dp)
                     .clickable {
-                        onApply(selectedMin, selectedMax)
+                        if (selectedMax > selectedMin) {
+                            onApply(selectedMin, selectedMax)
+                        }
                     },
                 color = Color.Green
             )
@@ -390,6 +392,12 @@ fun ScaleDialog(
         title = { Text("Definir escala de bits") },
         text = {
             Column {
+                Text(
+                    "Escala atual: ${selectedMin}-bit até ${selectedMax}-bit",
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
                 Text("Limite inferior")
                 DropdownSelector(
                     options = bitOptions,
@@ -421,10 +429,11 @@ fun DropdownSelector(
     Box {
         Text(
             "$selected-bit",
+            color = MaterialTheme.colorScheme.onSurface, // <- aqui
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = true }
-                .background(Color.LightGray)
+                .background(Color.DarkGray)
                 .padding(8.dp)
         )
 
@@ -434,7 +443,9 @@ fun DropdownSelector(
         ) {
             options.forEach { value ->
                 DropdownMenuItem(
-                    text = { Text("$value-bit") },
+                    text = {
+                        Text("$value-bit", color = MaterialTheme.colorScheme.onSurface) // <- aqui também
+                    },
                     onClick = {
                         onSelect(value)
                         expanded = false
