@@ -80,7 +80,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
             rangeStart
         }
 
-//        _items.value = emptyList()
         loadNextBatch()
     }
 
@@ -210,9 +209,16 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     fun slideToProgressInRange(normalizedProgress: Float) {
         synchronized(slideQueue) {
             slideQueue.add(normalizedProgress)
-            // Background
-            _totalBackgroundToScan.value = slideQueue.size * MainActivity.Instance.batchSize * 17
-            _currentBackgroundScanCount.value = 0
+
+            // Acumula se já tiver uma contagem em andamento
+            val newBatchCount = MainActivity.Instance.batchSize * 17
+            if (_currentBackgroundScanCount.value < _totalBackgroundToScan.value) {
+                _totalBackgroundToScan.value += newBatchCount
+            } else {
+                // Novo ciclo de contagem
+                _totalBackgroundToScan.value = newBatchCount
+                _currentBackgroundScanCount.value = 0
+            }
         }
     }
 
