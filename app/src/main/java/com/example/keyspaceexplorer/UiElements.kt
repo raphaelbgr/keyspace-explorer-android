@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +44,9 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     val progress by viewModel.progress.collectAsState()
     val bitLength by viewModel.bitLength.collectAsState()
     val loading by viewModel.loading.collectAsState()
+    val scannedCount by viewModel.scannedAddressesCount.collectAsState()
 
+    var showMatches by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<PrivateKeyItem?>(null) }
     var sliderValue by remember { mutableFloatStateOf(progress.toFloat()) }
     var expandedPage by remember { mutableStateOf(false) }
@@ -67,16 +71,49 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Página: $displayPage", fontSize = 14.sp)
-            if (fullPageString.length > 6) {
+            Column() {
+                Text("Página: $displayPage", fontSize = 12.sp)
+                if (fullPageString.length > 6) {
+                    Text(
+                        text = if (expandedPage) "[ocultar]" else "[expandir]",
+                        color = Color.Yellow,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .clickable { expandedPage = !expandedPage },
+                        fontSize = 8.sp
+                    )
+                }
                 Text(
-                    text = if (expandedPage) "[ocultar]" else "[expandir]",
-                    color = Color.Yellow,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .clickable { expandedPage = !expandedPage },
-                    fontSize = 13.sp
+                    text = "🔍 Endereços escaneados:",
+                    fontSize = 12.sp,
                 )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 4.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showMatches = true },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text("✅ Matches")
+                    }
+
+                    Text(
+                        text = scannedCount.toString(),
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
 
@@ -84,8 +121,11 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             value = sliderValue,
             onValueChange = {
                 sliderValue = it
+                viewModel.setLoading(true)
+                viewModel.slideToProgress(sliderValue)
             },
             onValueChangeFinished = {
+                viewModel.setLoading(false)
                 viewModel.jumpToProgress(sliderValue)
             },
             modifier = Modifier.fillMaxWidth()
@@ -119,6 +159,13 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
 
         if (loading) {
             LoadingView()
+        }
+
+        if (showMatches) {
+            MatchesDialog(
+                onDismiss = { showMatches = false },
+                onSelect = { selectedItem = it; showMatches = false }
+            )
         }
     }
 }

@@ -67,6 +67,8 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk15to18:1.78")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
+    implementation("com.google.code.gson:gson:2.10.1")
+
     // Testes
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

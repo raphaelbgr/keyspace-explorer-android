@@ -26,6 +26,9 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
 
     private var currentIndex = BigInteger.ONE
 
+    private val _scannedAddressesCount = MutableStateFlow(0)
+    val scannedAddressesCount: StateFlow<Int> = _scannedAddressesCount
+
     private val redisService = RedisService()
     val isConnecting =
         redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -34,7 +37,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         loadNextBatch()
     }
 
-    private suspend fun generateBatch(): List<PrivateKeyItem> {
+    private fun generateBatch(): List<PrivateKeyItem> {
         val batchSize = MainActivity.Instance.batchSize
         val batch = repository.generateBatch(currentIndex, batchSize)
         currentIndex += BigInteger.valueOf(batchSize.toLong())
@@ -62,7 +65,23 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
             ToastHelper.showToast(it)
         }
 
+        _scannedAddressesCount.value += batch.flatMap { it.addresses }.size
+
         return updatedBatch
+    }
+
+    private fun loadSilentNextBatch() {
+        viewModelScope.launch {
+            try {
+                val batch = generateBatch()
+                checkMatches(batch)
+
+                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
+                _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun loadNextBatch() {
@@ -87,6 +106,15 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         }
     }
 
+    fun slideToProgress(progress: Float) {
+        viewModelScope.launch {
+            val target = repository.progressToIndex(progress.toDouble())
+            currentIndex = target
+            _items.value = emptyList()
+            loadSilentNextBatch()
+        }
+    }
+
     fun jumpToProgress(progress: Float) {
         viewModelScope.launch {
             val target = repository.progressToIndex(progress.toDouble())
@@ -105,5 +133,9 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         return (totalKeys.toBigDecimal() * progress.toBigDecimal())
             .toBigInteger()
             .divide(BigInteger.valueOf(MainActivity.Instance.batchSize.toLong()))
+    }
+
+    fun setLoading(loading: Boolean) {
+        _loading.value = loading
     }
 }

@@ -1,10 +1,13 @@
 package com.example.keyspaceexplorer
 
 import android.annotation.SuppressLint
+import android.content.SharedPreferences
 import android.preference.PreferenceManager
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.FormBody
@@ -67,15 +70,41 @@ object TelegramHelper {
 }
 
 object StorageHelper {
+    private val gson = Gson()
+    private const val MATCHES_KEY = "matches"
+
     @SuppressLint("MutatingSharedPrefs", "UseKtx")
     fun saveMatch(item: PrivateKeyItem) {
         try {
             val prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.Instance.context)
-            val existing = prefs.getStringSet("matches", mutableSetOf()) ?: mutableSetOf()
-            existing.add("${item.hex}|${item.addresses.joinToString()}")
-            prefs.edit().putStringSet("matches", existing).apply()
+            val current = getMatches(prefs).toMutableList()
+
+            // Evita duplicatas
+            if (current.none { it.hex == item.hex }) {
+                current.add(item)
+                val json = gson.toJson(current)
+                prefs.edit().putString(MATCHES_KEY, json).apply()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun getMatches(): List<PrivateKeyItem> {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.Instance.context)
+        return getMatches(prefs)
+    }
+
+    private fun getMatches(prefs: SharedPreferences): List<PrivateKeyItem> {
+        return try {
+            val json = prefs.getString(MATCHES_KEY, null)
+            if (json != null) {
+                val type = object : TypeToken<List<PrivateKeyItem>>() {}.type
+                gson.fromJson(json, type)
+            } else emptyList()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
         }
     }
 }
