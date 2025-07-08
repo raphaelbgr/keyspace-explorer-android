@@ -4,8 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,11 +14,9 @@ import java.math.BigInteger
 import java.math.RoundingMode
 
 class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel() {
+
     private val _items = MutableStateFlow<List<PrivateKeyItem>>(emptyList())
     val items: StateFlow<List<PrivateKeyItem>> = _items
-
-//    private val _progress = MutableStateFlow(0.0)
-//    val progress: StateFlow<Double> = _progress
 
     private val _currentBackgroundScanCount = MutableStateFlow(0)
     val currentBackgroundScanCount: StateFlow<Int> = _currentBackgroundScanCount
@@ -28,7 +24,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     private val _totalBackgroundToScan = MutableStateFlow(0)
     val totalBackgroundToScan: StateFlow<Int> = _totalBackgroundToScan
 
-    private val _summary = MutableStateFlow("📊 Match com DB: ❌ Nenhum")
+    private val _summary = MutableStateFlow("\ud83d\udcca Match com DB: \u274c Nenhum")
     val summary: StateFlow<String> = _summary
 
     private val _loading = MutableStateFlow(false)
@@ -38,8 +34,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     val bitLength: StateFlow<Int> = _bitLength
 
     private var currentIndex = BigInteger.ONE
-
-    // Intervalo configurável do keyspace
     private var rangeStart: BigInteger = BitcoinUtils.MIN_KEYSPACE
     private var rangeEnd: BigInteger = BitcoinUtils.MAX_KEYSPACE
 
@@ -47,23 +41,18 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     val scannedAddressesCount: StateFlow<Int> = _scannedAddressesCount
 
     private val redisService = RedisService()
-    val isConnecting =
-        redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val isConnecting = redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    private val slideChannel = Channel<Float>(Channel.UNLIMITED)
     private val slideQueue = mutableListOf<Float>()
 
-    init {
-        // Inicia consumidor que processa 1 por vez
-        viewModelScope.launch(Dispatchers.IO) {
-            slideChannel.consumeEach { normalizedProgress ->
-                val newIndex = progressInRange(normalizedProgress)
-                currentIndex = newIndex
-                _items.value = emptyList()
-                loadSilentNextBatch()
-            }
-        }
+    data class ScanParams(
+        val currentIndex: BigInteger,
+        val rangeStart: BigInteger,
+        val rangeEnd: BigInteger,
+        val batchSize: Int
+    )
 
+    init {
         loadNextBatch()
     }
 
@@ -89,74 +78,56 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         return rangeStart + (range.toBigDecimal().multiply(percent)).toBigInteger()
     }
 
-    private fun generateBatch(): List<PrivateKeyItem> {
-        val batchSize = MainActivity.Instance.batchSize
-
-        if (currentIndex < rangeStart) {
-            currentIndex = rangeStart
+    private fun generateBatch(params: ScanParams): List<PrivateKeyItem> {
+        var index = params.currentIndex
+        if (index < params.rangeStart) index = params.rangeStart
+        if (index >= params.rangeEnd) {
+            index = (params.rangeEnd - BigInteger.ONE).subtract(BigInteger.valueOf(params.batchSize.toLong() - 1))
+                .coerceAtLeast(params.rangeStart)
         }
 
-        if (currentIndex >= rangeEnd) {
-            // Volta para a última página válida possível dentro do range
-            currentIndex = (rangeEnd - BigInteger.ONE).subtract(BigInteger.valueOf(batchSize.toLong() - 1))
-                .coerceAtLeast(rangeStart)
-        }
-
-        val upperLimit = (currentIndex + BigInteger.valueOf(batchSize.toLong())).coerceAtMost(rangeEnd)
-        val actualBatchSize = (upperLimit - currentIndex).toInt()
+        val upperLimit = (index + BigInteger.valueOf(params.batchSize.toLong())).coerceAtMost(params.rangeEnd)
+        val actualBatchSize = (upperLimit - index).toInt()
         if (actualBatchSize <= 0) return emptyList()
 
-        val batch = repository.generateBatch(currentIndex, actualBatchSize)
-        currentIndex += BigInteger.valueOf(actualBatchSize.toLong())
-        return batch
+        currentIndex = index + BigInteger.valueOf(actualBatchSize.toLong())
+        return repository.generateBatch(index, actualBatchSize)
     }
 
     private suspend fun checkMatches(batch: List<PrivateKeyItem>): List<PrivateKeyItem> {
         val allAddresses = batch.flatMap { it.addresses }
-        allAddresses.map { it.address = normalizeAddress(it.address, it.token) }
+        allAddresses.forEach { it.address = normalizeAddress(it.address, it.token) }
 
-
-        // Obtem os endereços normalizados que deram match
         val matchedSet = redisService.checkMatches(allAddresses)
-
-        // Background
         _currentBackgroundScanCount.value += allAddresses.size
 
-        // Atualiza cada item com matched e dbHit
-        val updatedBatch = mutableListOf<PrivateKeyItem>()
-        for ((index, item) in batch.withIndex()) {
-            val matched = item.addresses.filter {
-                normalizeAddress(it.address, it.token) in matchedSet
-            }
+        val updatedBatch = batch.map { item ->
+            val matched = item.addresses.filter { normalizeAddress(it.address, it.token) in matchedSet }
             item.dbHit = matched.isNotEmpty()
             item.matched = matched
-            updatedBatch += item
+            item
         }
 
-        // Executa alertas e persistência para os que tiveram hit
-        val found = updatedBatch.filter { it.dbHit == true }
-        found.forEach {
-            val alreadyExists = StorageHelper.alreadySaved(it)
-            if (!alreadyExists) {
+        updatedBatch.filter { it.dbHit == true }.forEach {
+            if (!StorageHelper.alreadySaved(it)) {
                 AlertHelper.alertMatch(it)
                 StorageHelper.saveMatch(it)
                 TelegramHelper.sendAlert(it)
                 LogHelper.logMatch(it)
                 ToastHelper.showToast(it)
             } else {
-                Log.d("MATCH", "🔁 Match duplicado ignorado: ${it.hex}")
+                Log.d("MATCH", "\ud83d\udd01 Match duplicado ignorado: ${it.hex}")
             }
         }
 
         _scannedAddressesCount.value += allAddresses.size
-
         return updatedBatch
     }
 
-    private fun loadSilentNextBatch() {
-        viewModelScope.launch(Dispatchers.IO)  {
+    private fun loadSilentNextBatch(params: ScanParams) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val batch = generateBatch()
+                val batch = generateBatch(params)
                 checkMatches(batch)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -165,21 +136,26 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     private fun loadNextBatch() {
-        viewModelScope.launch(Dispatchers.Main)  {
+        viewModelScope.launch(Dispatchers.Main) {
             try {
                 if (_loading.value) return@launch
                 _loading.value = true
 
-                val batch = generateBatch()
+                val params = ScanParams(
+                    currentIndex = currentIndex,
+                    rangeStart = rangeStart,
+                    rangeEnd = rangeEnd,
+                    batchSize = MainActivity.Instance.batchSize
+                )
+
+                val batch = generateBatch(params)
                 val updatedBatch = checkMatches(batch)
 
                 _items.value = updatedBatch
-
-                val hits = _items.value.count { it.dbHit == true }
-                _summary.value = if (hits == 0) {
-                    "📊 Match com DB: ❌ Nenhum"
+                _summary.value = if (updatedBatch.count { it.dbHit == true } == 0) {
+                    "\ud83d\udcca Match com DB: \u274c Nenhum"
                 } else {
-                    "📊 Match com DB: ✅ $hits encontrados"
+                    "\ud83d\udcca Match com DB: \u2705 ${updatedBatch.count { it.dbHit == true }} encontrados"
                 }
 
                 _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
@@ -193,15 +169,22 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     fun processSlideQueue() {
+        val paramsSnapshot = ScanParams(
+            currentIndex = currentIndex,
+            rangeStart = rangeStart,
+            rangeEnd = rangeEnd,
+            batchSize = MainActivity.Instance.batchSize
+        )
+
         viewModelScope.launch(Dispatchers.IO) {
-            val queueSnapshot: List<Float>
-            synchronized(slideQueue) {
-                queueSnapshot = slideQueue.toList()
-                slideQueue.clear()
+            val queueSnapshot = synchronized(slideQueue) {
+                slideQueue.toList().also { slideQueue.clear() }
             }
 
             for (progress in queueSnapshot) {
-                loadSilentNextBatch()
+                val newIndex = progressInRange(progress)
+                val updatedParams = paramsSnapshot.copy(currentIndex = newIndex)
+                loadSilentNextBatch(updatedParams)
             }
         }
     }
@@ -209,13 +192,10 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     fun slideToProgressInRange(normalizedProgress: Float) {
         synchronized(slideQueue) {
             slideQueue.add(normalizedProgress)
-
-            // Acumula se já tiver uma contagem em andamento
             val newBatchCount = MainActivity.Instance.batchSize * 17
             if (_currentBackgroundScanCount.value < _totalBackgroundToScan.value) {
                 _totalBackgroundToScan.value += newBatchCount
             } else {
-                // Novo ciclo de contagem
                 _totalBackgroundToScan.value = newBatchCount
                 _currentBackgroundScanCount.value = 0
             }
@@ -223,7 +203,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     fun jumpToProgressInRange(normalizedProgress: Float) {
-        // minimum precision = progressInRange(0.000000000000000000000000000000000000000000001f)
         viewModelScope.launch {
             val newIndex = progressInRange(normalizedProgress)
             currentIndex = newIndex
@@ -247,7 +226,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         if (range == BigInteger.ZERO) return 0.0
         val position = currentIndex - rangeStart
         return position.toBigDecimal()
-            .divide(range.toBigDecimal(), 10, java.math.RoundingMode.HALF_UP)
+            .divide(range.toBigDecimal(), 10, RoundingMode.HALF_UP)
             .toDouble()
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -43,10 +44,12 @@ import java.math.MathContext
 @Composable
 fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     val items by viewModel.items.collectAsState()
-//    val progress by viewModel.progress.collectAsState()
     val bitLength by viewModel.bitLength.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val scannedCount by viewModel.scannedAddressesCount.collectAsState()
+    val summary by viewModel.summary.collectAsState()
+    val currentScan by viewModel.currentBackgroundScanCount.collectAsState()
+    val totalToScan by viewModel.totalBackgroundToScan.collectAsState()
 
     var showMatches by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<PrivateKeyItem?>(null) }
@@ -54,42 +57,17 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var expandedPage by remember { mutableStateOf(false) }
     var scanOnDrag by remember { mutableStateOf(false) }
     var showScaleDialog by remember { mutableStateOf(false) }
-    val summary by viewModel.summary.collectAsState()
 
-    // Background
-    val currentScan by viewModel.currentBackgroundScanCount.collectAsState()
-    val totalToScan by viewModel.totalBackgroundToScan.collectAsState()
-
-    // aumenta a precisão
     val mathContext = MathContext(100)
-    // RangeSlider states
     var rangeStartSlider by remember { mutableStateOf(BigDecimal.ZERO) }
     var rangeEndSlider by remember { mutableStateOf(BigDecimal.ONE) }
 
-    val estimatedPage =
-        viewModel.estimatePage(sliderValueDecimal.toFloat()) // você deve implementar isso no ViewModel
+    val estimatedPage = viewModel.estimatePage(sliderValueDecimal.toFloat())
     val fullPageString = estimatedPage.toString()
-    val displayPage = if (!expandedPage && fullPageString.length > 6) {
-        fullPageString.take(6) + "..."
-    } else {
-        fullPageString
-    }
+    val displayPage = if (!expandedPage && fullPageString.length > 6) fullPageString.take(6) + "..." else fullPageString
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // RangeSlider UI
-        Text(
-            text = "Range: ${
-                rangeStartSlider.setScale(
-                    10,
-                    BigDecimal.ROUND_HALF_UP
-                )
-            } - ${rangeEndSlider.setScale(10, BigDecimal.ROUND_HALF_UP)}",
-            fontSize = 12.sp
-        )
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        RangeSliderHeader(rangeStartSlider, rangeEndSlider)
         RangeSlider(
             value = rangeStartSlider.toFloat()..rangeEndSlider.toFloat(),
             onValueChange = { range ->
@@ -98,113 +76,33 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             },
             onValueChangeFinished = {
                 val rangeSize = BitcoinUtils.MAX_KEYSPACE.subtract(BitcoinUtils.MIN_KEYSPACE)
-                val start = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal()
-                    .multiply(rangeStartSlider, mathContext).toBigInteger()
-                val end = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal()
-                    .multiply(rangeEndSlider, mathContext).toBigInteger()
+                val start = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal().multiply(rangeStartSlider, mathContext).toBigInteger()
+                val end = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal().multiply(rangeEndSlider, mathContext).toBigInteger()
                 viewModel.updateKeyspaceRange(start, end)
             },
             steps = 1000,
             modifier = Modifier.fillMaxWidth()
         )
 
-        val rangeProgress = viewModel.calculateRelativeProgress()
-        Text("Progresso no range: ${(rangeProgress * 100).format(4)}%", fontSize = 18.sp)
+        Text("Progresso no range: ${(viewModel.calculateRelativeProgress() * 100).format(4)}%", fontSize = 18.sp)
         Text("Altura (bits): $bitLength", fontSize = 16.sp)
-        Text("Items por pagina: ${items.size}", fontSize = 14.sp)
+        Text("Items por página: ${items.size}", fontSize = 14.sp)
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(vertical = 4.dp)
-        ) {
-            androidx.compose.material3.Checkbox(
-                checked = scanOnDrag,
-                onCheckedChange = { scanOnDrag = it }
-            )
-            Text(
-                text = "Scan on drag",
-                modifier = Modifier.padding(start = 8.dp),
-                fontSize = 14.sp
-            )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+            Checkbox(checked = scanOnDrag, onCheckedChange = { scanOnDrag = it })
+            Text("Scan on drag", modifier = Modifier.padding(start = 8.dp), fontSize = 14.sp)
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text("Página: $displayPage", fontSize = 12.sp)
-                if (fullPageString.length > 6) {
-                    Text(
-                        text = if (expandedPage) "[ocultar]" else "[expandir]",
-                        color = Color.Yellow,
-                        modifier = Modifier
-                            .padding(start = 8.dp)
-                            .clickable { expandedPage = !expandedPage },
-                        fontSize = 8.sp
-                    )
-                }
-                Text(
-                    text = "🔍 Endereços escaneados:",
-                    fontSize = 12.sp,
-                )
-                // Background
-                if (totalToScan > 0) {
-                    val done = currentScan >= totalToScan
-                    val statusEmoji = if (done) "✅" else "⏳"
-                    val statusText = if (done) "Escaneamento concluído: $currentScan endereços escaneados" else "Escaneando em background: $currentScan de $totalToScan endereços..."
-
-                    Text(
-                        text = "$statusEmoji $statusText",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
+                PageIndicator(displayPage, expandedPage, fullPageString) { expandedPage = !expandedPage }
+                ScanStatus(currentScan, totalToScan)
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(end = 4.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { showScaleDialog = true },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text("📏 Escala")
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    OutlinedButton(
-                        onClick = { showMatches = true },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text("✅ Matches")
-                    }
-
-                    Text(
-                        text = scannedCount.toString(),
-                        fontSize = 16.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
+            ControlsPanel(showScaleDialog, { showScaleDialog = true }, showMatches, { showMatches = true }, scannedCount)
         }
 
-        val sliderNormalized = sliderValueDecimal
-            .minus(rangeStartSlider)
-            .divide(rangeEndSlider.minus(rangeStartSlider).takeIf { it > BigDecimal.ZERO }
-                ?: BigDecimal.ONE, mathContext)
+        val sliderNormalized = sliderValueDecimal.minus(rangeStartSlider)
+            .divide(rangeEndSlider.minus(rangeStartSlider).takeIf { it > BigDecimal.ZERO } ?: BigDecimal.ONE, mathContext)
             .coerceIn(BigDecimal.ZERO, BigDecimal.ONE)
 
         Slider(
@@ -212,9 +110,7 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             onValueChange = {
                 val newDecimal = rangeStartSlider + (rangeEndSlider - rangeStartSlider)
                     .multiply(it.toBigDecimal(mathContext), mathContext)
-
                 sliderValueDecimal = newDecimal
-
                 if (scanOnDrag) {
                     viewModel.setLoading(true)
                     viewModel.slideToProgressInRange(sliderNormalized.toFloat())
@@ -227,62 +123,34 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             modifier = Modifier.fillMaxWidth()
         )
 
-        Text(
-            text = summary,
-            color = if (summary.contains("Nenhum")) Color.LightGray else Color(0xFF4CAF50),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
+        Text(summary, color = if (summary.contains("Nenhum")) Color.LightGray else Color(0xFF4CAF50), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
         Spacer(Modifier.height(8.dp))
-
         LazyColumn(modifier = Modifier.weight(1f)) {
-            items(items) { item ->
-                KeyItemCard(item) { selectedItem = item }
-            }
+            items(items) { item -> KeyItemCard(item) { selectedItem = item } }
         }
 
         selectedItem?.let {
-            KeyDetailDialog(
-                item = it,
-                existsInDb = it.dbHit
-            ) { selectedItem = null }
+            KeyDetailDialog(item = it, existsInDb = it.dbHit) { selectedItem = null }
         }
 
-        if (loading) {
-            LoadingView()
-        }
-
-        if (showMatches) {
-            MatchesDialog(
-                onDismiss = { showMatches = false },
-                onSelect = { selectedItem = it; showMatches = false }
-            )
-        }
-
-        if (showScaleDialog) {
-            ScaleDialog(
-                onApply = { minBits, maxBits ->
-                    val minValue = BigInteger.ONE.shiftLeft(minBits - 1)
-                    val maxValue = BigInteger.ONE.shiftLeft(maxBits).subtract(BigInteger.ONE)
-
-                    viewModel.updateKeyspaceRange(minValue, maxValue)
-                    showScaleDialog = false
-                },
-                onCancel = { showScaleDialog = false }
-            )
-        }
+        if (loading) LoadingView()
+        if (showMatches) MatchesDialog(onDismiss = { showMatches = false }, onSelect = { selectedItem = it; showMatches = false })
+        if (showScaleDialog) ScaleDialog(
+            onApply = { minBits, maxBits ->
+                val minValue = BigInteger.ONE.shiftLeft(minBits - 1)
+                val maxValue = BigInteger.ONE.shiftLeft(maxBits).subtract(BigInteger.ONE)
+                viewModel.updateKeyspaceRange(minValue, maxValue)
+                showScaleDialog = false
+            },
+            onCancel = { showScaleDialog = false }
+        )
     }
 }
 
 @Composable
 fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(4.dp)
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().padding(4.dp).clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
@@ -291,35 +159,62 @@ fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
                 false -> "❌"
                 null -> "❓"
             }
-
             val dbStatusColor = when (item.dbHit) {
                 true -> Color(0xFF4CAF50)
                 false -> Color.Gray
                 null -> Color.LightGray
             }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Index: ${item.index.toScientificNotation()}",
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "\uD83D\uDD11: ...${item.hex.takeLast(6)}",
-                        fontSize = 12.sp
-                    )
+                    Text("Index: ${item.index.toScientificNotation()}", fontWeight = FontWeight.Bold)
+                    Text("🔑: ...${item.hex.takeLast(6)}", fontSize = 12.sp)
                 }
-
-                Text(
-                    text = dbStatusEmoji,
-                    fontSize = 18.sp,
-                    color = dbStatusColor,
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                )
+                Text(dbStatusEmoji, fontSize = 18.sp, color = dbStatusColor, modifier = Modifier.align(Alignment.CenterVertically))
             }
+        }
+    }
+}
+
+@Composable
+fun RangeSliderHeader(start: BigDecimal, end: BigDecimal) {
+    Text("Range: ${start.setScale(10, BigDecimal.ROUND_HALF_UP)} - ${end.setScale(10, BigDecimal.ROUND_HALF_UP)}", fontSize = 12.sp)
+}
+
+@Composable
+fun PageIndicator(displayPage: String, expanded: Boolean, fullText: String, onToggle: () -> Unit) {
+    Text("Página: $displayPage", fontSize = 12.sp)
+    if (fullText.length > 6) {
+        Text(
+            text = if (expanded) "[ocultar]" else "[expandir]",
+            color = Color.Yellow,
+            fontSize = 8.sp,
+            modifier = Modifier.padding(start = 8.dp).clickable { onToggle() }
+        )
+    }
+}
+
+@Composable
+fun ScanStatus(current: Int, total: Int) {
+    if (total > 0) {
+        val done = current >= total
+        val emoji = if (done) "✅" else "⏳"
+        val text = if (done) "Escaneamento concluído: $current endereços escaneados" else "Escaneando em background: $current de $total endereços..."
+        Text("$emoji $text", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
+fun ControlsPanel(showScaleDialog: Boolean, onScaleClick: () -> Unit, showMatches: Boolean, onMatchesClick: () -> Unit, scannedCount: Int) {
+    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp)) {
+            OutlinedButton(onClick = onScaleClick, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Text("📏 Escala")
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(onClick = onMatchesClick, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Text("✅ Matches")
+            }
+            Text(scannedCount.toString(), fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -332,56 +227,22 @@ fun BigInteger.toScientificNotation(): String {
 }
 
 fun Int.toSuperscript(): String {
-    val map = mapOf(
-        '0' to '⁰', '1' to '¹', '2' to '²', '3' to '³',
-        '4' to '⁴', '5' to '⁵', '6' to '⁶', '7' to '⁷',
-        '8' to '⁸', '9' to '⁹'
-    )
+    val map = mapOf('0' to '⁰', '1' to '¹', '2' to '²', '3' to '³', '4' to '⁴', '5' to '⁵', '6' to '⁶', '7' to '⁷', '8' to '⁸', '9' to '⁹')
     return this.toString().map { map[it] ?: it }.joinToString("")
 }
 
 @Composable
 fun LoadingView(modifier: Modifier = Modifier) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
-    ) {
+    Box(contentAlignment = Alignment.Center, modifier = modifier.fillMaxSize().background(Color.Transparent)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(
-                strokeWidth = 4.dp,
-                modifier = Modifier.size(48.dp)
-            )
+            CircularProgressIndicator(strokeWidth = 4.dp, modifier = Modifier.size(48.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Carregando...",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Text("Carregando...", color = Color.White, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
 
-@Composable
-fun ConnectionStatusIndicator(isConnecting: Boolean) {
-    if (isConnecting) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.Red)
-                .padding(8.dp)
-        ) {
-            Text(
-                "🔌 Reconectando ao banco de dados...",
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-    }
-}
-
-fun Double.format(digits: Int) = "% .${digits}f".format(this)
+fun Double.format(digits: Int): String = "% .${digits}f".format(this)
 
 @Preview(showBackground = true)
 @Composable
@@ -390,19 +251,10 @@ fun PreviewKeyItemCard() {
         index = BigInteger("12345678901234567890"),
         hex = "0000000000000000000000000000000000000000000000000000000000000001",
         addresses = listOf(
-            CryptoAddress(
-                token = "BTC",
-                variant = "P2PKH",
-                address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-            ),
-            CryptoAddress(
-                token = "BTC",
-                variant = "P2SH",
-                address = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
-            )
+            CryptoAddress(token = "BTC", variant = "P2PKH", address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"),
+            CryptoAddress(token = "BTC", variant = "P2SH", address = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy")
         ),
         dbHit = true
     )
-
     KeyItemCard(item = sampleItem, onClick = {})
 }
