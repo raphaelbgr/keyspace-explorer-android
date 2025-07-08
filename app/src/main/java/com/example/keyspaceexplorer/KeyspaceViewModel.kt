@@ -34,37 +34,48 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         loadNextBatch()
     }
 
+    private suspend fun generateBatch(): List<PrivateKeyItem> {
+        val batchSize = MainActivity.Instance.batchSize
+        val batch = repository.generateBatch(currentIndex, batchSize)
+        currentIndex += BigInteger.valueOf(batchSize.toLong())
+        return batch
+    }
+
+    private suspend fun checkMatches(batch: List<PrivateKeyItem>): List<PrivateKeyItem> {
+        val allAddresses = batch.flatMap { it.addresses }
+        val matches = redisService.checkMatches(allAddresses)
+
+        val updatedBatch = batch.map { item ->
+            val hasHit = item.addresses.any { addr ->
+                normalize(addr.address, addr.token) in matches
+            }
+            item.dbHit = hasHit
+            item
+        }
+
+        val found = updatedBatch.filter { it.dbHit == true }
+        found.forEach {
+            AlertHelper.alertMatch(it)
+            StorageHelper.saveMatch(it)
+            TelegramHelper.sendAlert(it)
+            LogHelper.logMatch(it)
+            ToastHelper.showToast(it)
+        }
+
+        return updatedBatch
+    }
+
     private fun loadNextBatch() {
         viewModelScope.launch {
             try {
                 if (_loading.value) return@launch
                 _loading.value = true
 
+                val batch = generateBatch()
+                val updatedBatch = checkMatches(batch)
+
                 val batchSize = MainActivity.Instance.batchSize
-                val batch = repository.generateBatch(currentIndex, batchSize)
-
-                val allAddresses = batch.flatMap { it.addresses }
-                val matches = redisService.checkMatches(allAddresses)
-
-                val updatedBatch = batch.map { item ->
-                    val hasHit = item.addresses.any { addr ->
-                        normalize(addr.address, addr.token) in matches
-                    }
-                    item.dbHit = hasHit
-                    item
-                }
-
-                val found = updatedBatch.filter { it.dbHit == true }
-                found.forEach {
-                    AlertHelper.alertMatch(it)
-                    StorageHelper.saveMatch(it)
-                    TelegramHelper.sendAlert(it)
-                    LogHelper.logMatch(it)
-                    ToastHelper.showToast(it)
-                }
-
                 _items.value = (_items.value + updatedBatch).takeLast(batchSize * 3)
-                currentIndex += BigInteger.valueOf(batchSize.toLong())
 
                 _progress.value = BitcoinUtils.calculateProgress(currentIndex)
                 _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
@@ -86,7 +97,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     fun estimatePage(progress: Float): BigInteger {
-        // Suponha que o total de chaves seja 2^bitLength
         val totalKeys = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             BigInteger.TWO.pow(bitLength.value)
         } else {

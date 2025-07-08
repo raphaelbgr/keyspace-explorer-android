@@ -41,11 +41,10 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     val items by viewModel.items.collectAsState()
     val progress by viewModel.progress.collectAsState()
     val bitLength by viewModel.bitLength.collectAsState()
+    val loading by viewModel.loading.collectAsState()
+
     var selectedItem by remember { mutableStateOf<PrivateKeyItem?>(null) }
-
     var sliderValue by remember { mutableFloatStateOf(progress.toFloat()) }
-    var loading by remember { mutableStateOf(false) }
-
     var expandedPage by remember { mutableStateOf(false) }
 
     val estimatedPage = viewModel.estimatePage(sliderValue) // você deve implementar isso no ViewModel
