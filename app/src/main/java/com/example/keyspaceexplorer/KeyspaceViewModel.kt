@@ -1,6 +1,6 @@
 package com.example.keyspaceexplorer
 
-import android.widget.Toast
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.keyspaceexplorer.AddressUtils.normalize
@@ -83,5 +83,17 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
             _items.value = emptyList()
             loadNextBatch()
         }
+    }
+
+    fun estimatePage(progress: Float): BigInteger {
+        // Suponha que o total de chaves seja 2^bitLength
+        val totalKeys = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            BigInteger.TWO.pow(bitLength.value)
+        } else {
+            TODO("VERSION.SDK_INT < TIRAMISU")
+        }
+        return (totalKeys.toBigDecimal() * progress.toBigDecimal())
+            .toBigInteger()
+            .divide(BigInteger.valueOf(MainActivity.Instance.batchSize.toLong()))
     }
 }

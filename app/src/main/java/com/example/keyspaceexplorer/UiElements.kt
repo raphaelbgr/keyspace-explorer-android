@@ -46,6 +46,16 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var sliderValue by remember { mutableFloatStateOf(progress.toFloat()) }
     var loading by remember { mutableStateOf(false) }
 
+    var expandedPage by remember { mutableStateOf(false) }
+
+    val estimatedPage = viewModel.estimatePage(sliderValue) // você deve implementar isso no ViewModel
+    val fullPageString = estimatedPage.toString()
+    val displayPage = if (!expandedPage && fullPageString.length > 6) {
+        fullPageString.take(6) + "..."
+    } else {
+        fullPageString
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -54,6 +64,22 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
         Text("Progresso: ${(progress * 100).format(4)}%", fontSize = 18.sp)
         Text("Altura (bits): $bitLength", fontSize = 16.sp)
         Text("Items por pagina: ${items.size}", fontSize = 14.sp)
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Página: $displayPage", fontSize = 14.sp)
+            if (fullPageString.length > 6) {
+                Text(
+                    text = if (expandedPage) "[ocultar]" else "[expandir]",
+                    color = Color.Yellow,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .clickable { expandedPage = !expandedPage },
+                    fontSize = 13.sp
+                )
+            }
+        }
 
         Slider(
             value = sliderValue,

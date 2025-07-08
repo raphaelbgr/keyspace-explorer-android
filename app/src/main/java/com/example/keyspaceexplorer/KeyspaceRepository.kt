@@ -60,7 +60,7 @@ class KeyspaceRepository(private val redisService: RedisService) {
     }
 
     fun progressToIndex(progress: Double): BigInteger {
-        val max = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE", 16)
+        val max = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140", 16)
         return (max.toBigDecimal() * progress.toBigDecimal()).toBigInteger()
     }
 }

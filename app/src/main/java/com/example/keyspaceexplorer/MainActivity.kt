@@ -1,5 +1,7 @@
 package com.example.keyspaceexplorer
 
+import android.app.Activity
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -36,12 +38,14 @@ class MainActivity : ComponentActivity() {
     }
 
     object Instance {
-        var context: ComponentActivity? = null
+        var activity: Activity? = null
+        var context: Context? = null
         const val batchSize = 45
     }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Instance.activity = this
         Instance.context = this
         super.onCreate(savedInstanceState)
         setContent {

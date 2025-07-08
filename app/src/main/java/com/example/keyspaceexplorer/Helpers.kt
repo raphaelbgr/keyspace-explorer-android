@@ -19,12 +19,24 @@ import java.security.MessageDigest
 object AlertHelper {
     fun alertMatch(item: PrivateKeyItem) {
         try {
-            MainActivity.Instance.context?.application?.let {
-                AlertDialog.Builder(it).apply {
-                    setTitle("Match encontrado!")
-                    setMessage("PrivKey: ${item.hex}\nAddress: ${item.addresses.joinToString()}")
-                    setPositiveButton("OK", null)
-                }.show()
+            MainActivity.Instance?.context.let { activity ->
+                val message = buildString {
+                    appendLine("🔐 Chave Privada:")
+                    appendLine("   ${item.hex}")
+                    appendLine()
+                    appendLine("📬 Endereços derivadas:")
+                    item.addresses.forEach { address ->
+                        appendLine("   $address")
+                    }
+                }
+
+                MainActivity.Instance?.context?.let {
+                    AlertDialog.Builder(it)
+                        .setTitle("✅ Match encontrado no banco!")
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
