@@ -34,8 +34,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +49,7 @@ import kotlinx.coroutines.launch
 import java.math.BigInteger
 import java.math.RoundingMode
 
+@OptIn(ExperimentalComposeUiApi::class)
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun KeyDetailDialog(
@@ -93,11 +96,16 @@ fun KeyDetailDialog(
         },
         text = {
             BoxWithConstraints(modifier = Modifier.heightIn(min = 300.dp, max = 500.dp)) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInteropFilter {
+                            it.action == android.view.MotionEvent.ACTION_HOVER_EXIT
+                        }
+                ) {
                     item {
                         Text("📄 Informações Gerais", fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(4.dp))
-                        // Index com botão expandir
                         var expandedIndex by remember { mutableStateOf(false) }
                         val indexStr = index.toString()
                         val shortIndex = indexStr.take(6)
@@ -124,7 +132,6 @@ fun KeyDetailDialog(
 
                         Spacer(modifier = Modifier.height(2.dp))
 
-                        // Página com botão expandir
                         var expandedPage by remember { mutableStateOf(false) }
                         val pageStr = pageNumber.toString()
                         val shortPage = pageStr.take(10)
@@ -266,6 +273,7 @@ fun KeyDetailDialog(
     )
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
     val matches = remember { StorageHelper.getMatches() }
@@ -279,7 +287,13 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
                 .padding(16.dp)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .pointerInteropFilter {
+                        it.action == android.view.MotionEvent.ACTION_HOVER_EXIT
+                    }
+            ) {
                 Text("✅ Matches Encontrados", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Spacer(Modifier.height(8.dp))
 
@@ -292,7 +306,7 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
                             .fillMaxWidth()
                     ) {
                         items(matches) { item ->
-                            val matchHighlightColor = Color.Gray // fundo opcional verde-claro
+                            val matchHighlightColor = Color.Gray
                             val isMatched = item.matched?.isNotEmpty() == true
 
                             Card(

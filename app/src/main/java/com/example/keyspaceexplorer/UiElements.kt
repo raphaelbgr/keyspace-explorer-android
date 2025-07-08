@@ -50,6 +50,7 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var selectedItem by remember { mutableStateOf<PrivateKeyItem?>(null) }
     var sliderValue by remember { mutableFloatStateOf(progress.toFloat()) }
     var expandedPage by remember { mutableStateOf(false) }
+    var scanOnDrag by remember { mutableStateOf(true) }
 
     val estimatedPage = viewModel.estimatePage(sliderValue) // você deve implementar isso no ViewModel
     val fullPageString = estimatedPage.toString()
@@ -69,9 +70,24 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
         Text("Items por pagina: ${items.size}", fontSize = 14.sp)
 
         Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            androidx.compose.material3.Checkbox(
+                checked = scanOnDrag,
+                onCheckedChange = { scanOnDrag = it }
+            )
+            Text(
+                text = "Scan on drag",
+                modifier = Modifier.padding(start = 8.dp),
+                fontSize = 14.sp
+            )
+        }
+
+        Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column() {
+            Column {
                 Text("Página: $displayPage", fontSize = 12.sp)
                 if (fullPageString.length > 6) {
                     Text(
@@ -121,8 +137,10 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             value = sliderValue,
             onValueChange = {
                 sliderValue = it
-                viewModel.setLoading(true)
-                viewModel.slideToProgress(sliderValue)
+                if (scanOnDrag) {
+                    viewModel.setLoading(true)
+                    viewModel.slideToProgress(sliderValue)
+                }
             },
             onValueChangeFinished = {
                 viewModel.setLoading(false)
