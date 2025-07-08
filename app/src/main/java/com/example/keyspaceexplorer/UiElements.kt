@@ -53,6 +53,7 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var sliderValueDecimal by remember { mutableStateOf(BigDecimal.ZERO) }
     var expandedPage by remember { mutableStateOf(false) }
     var scanOnDrag by remember { mutableStateOf(false) }
+    var showScaleDialog by remember { mutableStateOf(false) }
 
     // aumenta a precisão
     val mathContext = MathContext(100)
@@ -146,6 +147,17 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
                         .padding(end = 4.dp)
                 ) {
                     OutlinedButton(
+                        onClick = { showScaleDialog = true },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text("📏 Escala")
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    OutlinedButton(
                         onClick = { showMatches = true },
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -222,6 +234,19 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             MatchesDialog(
                 onDismiss = { showMatches = false },
                 onSelect = { selectedItem = it; showMatches = false }
+            )
+        }
+
+        if (showScaleDialog) {
+            ScaleDialog(
+                onApply = { minBits, maxBits ->
+                    val minValue = BigInteger.ONE.shiftLeft(minBits - 1)
+                    val maxValue = BigInteger.ONE.shiftLeft(maxBits).subtract(BigInteger.ONE)
+
+                    viewModel.updateKeyspaceRange(minValue, maxValue)
+                    showScaleDialog = false
+                },
+                onCancel = { showScaleDialog = false }
             )
         }
     }

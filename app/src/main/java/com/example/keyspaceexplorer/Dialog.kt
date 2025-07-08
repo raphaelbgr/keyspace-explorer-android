@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -348,6 +351,95 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
                     Text("Fechar")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ScaleDialog(
+    onApply: (minBits: Int, maxBits: Int) -> Unit,
+    onCancel: () -> Unit
+) {
+    val bitOptions = (8..256 step 8).toList()
+    var selectedMin by remember { mutableStateOf(8) }
+    var selectedMax by remember { mutableStateOf(256) }
+
+    AlertDialog(
+        onDismissRequest = onCancel,
+        confirmButton = {
+            Text(
+                "Aplicar",
+                modifier = Modifier
+                    .padding(8.dp)
+                    .clickable {
+                        onApply(selectedMin, selectedMax)
+                    },
+                color = Color.Green
+            )
+        },
+        dismissButton = {
+            Text(
+                "Cancelar",
+                modifier = Modifier
+                    .padding(8.dp)
+                    .clickable(onClick = onCancel),
+                color = Color.Red
+            )
+        },
+        title = { Text("Definir escala de bits") },
+        text = {
+            Column {
+                Text("Limite inferior")
+                DropdownSelector(
+                    options = bitOptions,
+                    selected = selectedMin,
+                    onSelect = { selectedMin = it }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text("Limite superior")
+                DropdownSelector(
+                    options = bitOptions,
+                    selected = selectedMax,
+                    onSelect = { selectedMax = it }
+                )
+            }
+        }
+    )
+}
+
+@Composable
+fun DropdownSelector(
+    options: List<Int>,
+    selected: Int,
+    onSelect: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Text(
+            "$selected-bit",
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+                .background(Color.LightGray)
+                .padding(8.dp)
+        )
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { value ->
+                DropdownMenuItem(
+                    text = { Text("$value-bit") },
+                    onClick = {
+                        onSelect(value)
+                        expanded = false
+                    }
+                )
             }
         }
     }

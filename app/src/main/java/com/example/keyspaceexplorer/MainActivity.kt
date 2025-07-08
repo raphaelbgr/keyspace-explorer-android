@@ -1,5 +1,6 @@
 package com.example.keyspaceexplorer
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
@@ -12,6 +13,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 
 class MainActivity : ComponentActivity() {
 
@@ -49,14 +52,28 @@ class MainActivity : ComponentActivity() {
         Instance.context = this
         super.onCreate(savedInstanceState)
         setContent {
-            KeyspaceExplorerTheme (darkTheme = false) {
+            KeyspaceExplorerTheme(darkTheme = false) {
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .ignoreHover(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     KeyspaceScreen(viewModel)
                 }
             }
+        }
+    }
+}
+
+@SuppressLint("ReturnFromAwaitPointerEventScope")
+fun Modifier.ignoreHover(): Modifier = this.pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            if (event.type == PointerEventType.Enter || event.type == PointerEventType.Exit || event.type.toString()
+                    .contains("Hover", true)
+            ) { continue }
         }
     }
 }
