@@ -57,6 +57,7 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var expandedPage by remember { mutableStateOf(false) }
     var scanOnDrag by remember { mutableStateOf(false) }
     var showScaleDialog by remember { mutableStateOf(false) }
+    var showManualScanDialog by remember { mutableStateOf(false) }
 
     val mathContext = MathContext(100)
     var rangeStartSlider by remember { mutableStateOf(BigDecimal.ZERO) }
@@ -98,7 +99,14 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
                 PageIndicator(displayPage, expandedPage, fullPageString) { expandedPage = !expandedPage }
                 ScanStatus(currentScan, totalToScan)
             }
-            ControlsPanel(showScaleDialog, { showScaleDialog = true }, showMatches, { showMatches = true }, scannedCount)
+            ControlsPanel(
+                showScaleDialog = showScaleDialog,
+                onScaleClick = { showScaleDialog = true },
+                showMatches = showMatches,
+                onMatchesClick = { showMatches = true },
+                scannedCount = scannedCount,
+                onManualScanClick = { showManualScanDialog = true }
+            )
         }
 
         val sliderNormalized = sliderValueDecimal.minus(rangeStartSlider)
@@ -144,6 +152,15 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             },
             onCancel = { showScaleDialog = false }
         )
+        if (showManualScanDialog) {
+            ManualScanDialog(
+                viewModel = viewModel,
+                onDismiss = { showManualScanDialog = false },
+                onScanRequested = { direction, quantity, repeat ->
+                    viewModel.startManualScan(direction, quantity, repeat)
+                }
+            )
+        }
     }
 }
 
@@ -204,15 +221,35 @@ fun ScanStatus(current: Int, total: Int) {
 }
 
 @Composable
-fun ControlsPanel(showScaleDialog: Boolean, onScaleClick: () -> Unit, showMatches: Boolean, onMatchesClick: () -> Unit, scannedCount: Int) {
+fun ControlsPanel(
+    showScaleDialog: Boolean,
+    onScaleClick: () -> Unit,
+    showMatches: Boolean,
+    onMatchesClick: () -> Unit,
+    scannedCount: Int,
+    onManualScanClick: () -> Unit
+) {
     Box(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp)) {
-            OutlinedButton(onClick = onScaleClick, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            OutlinedButton(
+                onClick = onScaleClick,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
                 Text("📏 Escala")
             }
             Spacer(modifier = Modifier.height(4.dp))
-            OutlinedButton(onClick = onMatchesClick, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            OutlinedButton(
+                onClick = onMatchesClick,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
                 Text("✅ Matches")
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = onManualScanClick,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Text("🔍 Scan Manual")
             }
             Text(scannedCount.toString(), fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp))
         }
