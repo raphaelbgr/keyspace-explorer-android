@@ -3,6 +3,9 @@ package com.example.keyspaceexplorer
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +19,11 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     private val _items = MutableStateFlow<List<PrivateKeyItem>>(emptyList())
     val items: StateFlow<List<PrivateKeyItem>> = _items
 
-    private val _progress = MutableStateFlow(0.0)
-    val progress: StateFlow<Double> = _progress
+//    private val _progress = MutableStateFlow(0.0)
+//    val progress: StateFlow<Double> = _progress
+
+    private val _summary = MutableStateFlow("📊 Match com DB: ❌ Nenhum")
+    val summary: StateFlow<String> = _summary
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
@@ -38,9 +44,20 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     val isConnecting =
         redisService.isConnecting.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    // Os campos públicos antigos não são mais necessários, agora são privados acima
+    private val slideChannel = Channel<Float>(Channel.UNLIMITED)
+    private val slideQueue = mutableListOf<Float>()
 
     init {
+        // Inicia consumidor que processa 1 por vez
+        viewModelScope.launch(Dispatchers.IO) {
+            slideChannel.consumeEach { normalizedProgress ->
+                val newIndex = progressInRange(normalizedProgress)
+                currentIndex = newIndex
+                _items.value = emptyList()
+                loadSilentNextBatch()
+            }
+        }
+
         loadNextBatch()
     }
 
@@ -57,7 +74,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
             rangeStart
         }
 
-        _items.value = emptyList()
+//        _items.value = emptyList()
         loadNextBatch()
     }
 
@@ -127,13 +144,13 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     private fun loadSilentNextBatch() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO)  {
             try {
                 val batch = generateBatch()
                 checkMatches(batch)
 
-                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
-                _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
+//                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
+//                _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -141,7 +158,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     private fun loadNextBatch() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Main)  {
             try {
                 if (_loading.value) return@launch
                 _loading.value = true
@@ -149,33 +166,65 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
                 val batch = generateBatch()
                 val updatedBatch = checkMatches(batch)
 
-                val batchSize = MainActivity.Instance.batchSize
-                _items.value = (_items.value + updatedBatch).takeLast(batchSize * 3)
+//                val batchSize = MainActivity.Instance.batchSize
+//                _items.value = (_items.value + updatedBatch).takeLast(batchSize)
+                _items.value = updatedBatch
 
-                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
+                val hits = _items.value.count { it.dbHit == true }
+                _summary.value = if (hits == 0) {
+                    "📊 Match com DB: ❌ Nenhum"
+                } else {
+                    "📊 Match com DB: ✅ $hits encontrados"
+                }
+
+//                _progress.value = BitcoinUtils.calculateProgress(currentIndex)
                 _bitLength.value = BitcoinUtils.calculateBitLength(currentIndex)
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
+                processSlideQueue()
                 _loading.value = false
             }
         }
     }
 
+    fun processSlideQueue() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val queueSnapshot: List<Float>
+
+            synchronized(slideQueue) {
+                queueSnapshot = slideQueue.toList()
+                slideQueue.clear()
+            }
+
+            for (progress in queueSnapshot) {
+//                val newIndex = progressInRange(progress)
+//                currentIndex = newIndex
+//                _items.value = emptyList()
+                loadSilentNextBatch()
+            }
+        }
+    }
+
     fun slideToProgressInRange(normalizedProgress: Float) {
-        viewModelScope.launch {
-            val newIndex = progressInRange(normalizedProgress)
-            currentIndex = newIndex
-            _items.value = emptyList()
-            loadSilentNextBatch()
+//        viewModelScope.launch {
+//            val newIndex = progressInRange(normalizedProgress)
+//            currentIndex = newIndex
+//            _items.value = emptyList()
+//            loadSilentNextBatch()
+//        }
+//        slideChannel.trySend(normalizedProgress)
+        synchronized(slideQueue) {
+            slideQueue.add(normalizedProgress)
         }
     }
 
     fun jumpToProgressInRange(normalizedProgress: Float) {
+        // minimum precision = progressInRange(0.000000000000000000000000000000000000000000001f)
         viewModelScope.launch {
             val newIndex = progressInRange(normalizedProgress)
             currentIndex = newIndex
-            _items.value = emptyList()
+//            _items.value = emptyList()
             loadNextBatch()
         }
     }

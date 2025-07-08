@@ -36,6 +36,7 @@ class KeyspaceRepository {
                                 }
                                 bipClass?.derive(hex, coinVariant.coin)
                             } catch (e: Exception) {
+                                e.printStackTrace()
                                 null
                             }
                         }

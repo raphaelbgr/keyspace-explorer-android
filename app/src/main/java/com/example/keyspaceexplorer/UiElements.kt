@@ -43,7 +43,7 @@ import java.math.MathContext
 @Composable
 fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     val items by viewModel.items.collectAsState()
-    val progress by viewModel.progress.collectAsState()
+//    val progress by viewModel.progress.collectAsState()
     val bitLength by viewModel.bitLength.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val scannedCount by viewModel.scannedAddressesCount.collectAsState()
@@ -54,6 +54,7 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var expandedPage by remember { mutableStateOf(false) }
     var scanOnDrag by remember { mutableStateOf(false) }
     var showScaleDialog by remember { mutableStateOf(false) }
+    val summary by viewModel.summary.collectAsState()
 
     // aumenta a precisão
     val mathContext = MathContext(100)
@@ -61,7 +62,8 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     var rangeStartSlider by remember { mutableStateOf(BigDecimal.ZERO) }
     var rangeEndSlider by remember { mutableStateOf(BigDecimal.ONE) }
 
-    val estimatedPage = viewModel.estimatePage(sliderValueDecimal.toFloat()) // você deve implementar isso no ViewModel
+    val estimatedPage =
+        viewModel.estimatePage(sliderValueDecimal.toFloat()) // você deve implementar isso no ViewModel
     val fullPageString = estimatedPage.toString()
     val displayPage = if (!expandedPage && fullPageString.length > 6) {
         fullPageString.take(6) + "..."
@@ -76,7 +78,12 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
     ) {
         // RangeSlider UI
         Text(
-            text = "Range: ${rangeStartSlider.setScale(10, BigDecimal.ROUND_HALF_UP)} - ${rangeEndSlider.setScale(10, BigDecimal.ROUND_HALF_UP)}",
+            text = "Range: ${
+                rangeStartSlider.setScale(
+                    10,
+                    BigDecimal.ROUND_HALF_UP
+                )
+            } - ${rangeEndSlider.setScale(10, BigDecimal.ROUND_HALF_UP)}",
             fontSize = 12.sp
         )
         RangeSlider(
@@ -87,8 +94,10 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             },
             onValueChangeFinished = {
                 val rangeSize = BitcoinUtils.MAX_KEYSPACE.subtract(BitcoinUtils.MIN_KEYSPACE)
-                val start = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal().multiply(rangeStartSlider, mathContext).toBigInteger()
-                val end = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal().multiply(rangeEndSlider, mathContext).toBigInteger()
+                val start = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal()
+                    .multiply(rangeStartSlider, mathContext).toBigInteger()
+                val end = BitcoinUtils.MIN_KEYSPACE + rangeSize.toBigDecimal()
+                    .multiply(rangeEndSlider, mathContext).toBigInteger()
                 viewModel.updateKeyspaceRange(start, end)
             },
             steps = 1000,
@@ -177,7 +186,8 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
 
         val sliderNormalized = sliderValueDecimal
             .minus(rangeStartSlider)
-            .divide(rangeEndSlider.minus(rangeStartSlider).takeIf { it > BigDecimal.ZERO } ?: BigDecimal.ONE, mathContext)
+            .divide(rangeEndSlider.minus(rangeStartSlider).takeIf { it > BigDecimal.ZERO }
+                ?: BigDecimal.ONE, mathContext)
             .coerceIn(BigDecimal.ZERO, BigDecimal.ONE)
 
         Slider(
@@ -200,12 +210,9 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
             modifier = Modifier.fillMaxWidth()
         )
 
-        val hits = items.count { it.dbHit == true }
-        val summary = if (hits == 0) "📊 Match com DB: ❌ Nenhum" else "📊 Match com DB: ✅ $hits encontrados"
-
         Text(
             text = summary,
-            color = if (hits > 0) Color(0xFF4CAF50) else Color.LightGray,
+            color = if (summary.contains("Nenhum")) Color.LightGray else Color(0xFF4CAF50),
             fontWeight = FontWeight.SemiBold,
             fontSize = 16.sp,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -322,7 +329,7 @@ fun LoadingView(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f))
+            .background(Color.Transparent)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(
