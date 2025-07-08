@@ -135,8 +135,8 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     fun estimatePage(progress: Float): BigInteger {
-        val bitLen = bitLength.value  // Se bitLength for um `State<Int>`
-        val totalKeys = BigInteger.TWO.pow(bitLen)
+        val bitLen = bitLength.value  // ou item.index.bitLength() se for o caso
+        val totalKeys = BigInteger.valueOf(2).pow(bitLen)
 
         return (totalKeys.toBigDecimal() * progress.toBigDecimal())
             .toBigInteger()
