@@ -6,13 +6,14 @@ data class PrivateKeyItem(
     val index: BigInteger,
     val hex: String,
     val addresses: List<CryptoAddress>,
-    var dbHit: Boolean? = null
+    var dbHit: Boolean? = null,
+    var matched: List<CryptoAddress>? = null,
 )
 
 data class CryptoAddress(
     val token: String,        // Ex: "BTC", "ETH"
     val variant: String,      // Ex: "P2PKH", "Bech32", etc.
-    val address: String,
+    var address: String,
 ) {
     fun variantPretty() = when (this.variant) {
         "P2PKH" -> "compressed"
@@ -22,15 +23,25 @@ data class CryptoAddress(
         "Bech32" -> "bech32"
         else -> ""
     }
+
+    fun fullAddressPretty(): String {
+        if (variantPretty().isEmpty()) {
+            return "[$token] $address"
+        } else {
+            return "[$token - ${variantPretty()}] $address"
+        }
+    }
 }
 
 sealed class CoinVariant {
     abstract val name: String
     abstract val coin: String
+
     data class BipVariant(val bip: String, val coinType: String) : CoinVariant() {
         override val name = bip
         override val coin = coinType
     }
+
     data class UncompressedVariant(val coinType: String) : CoinVariant() {
         override val name = "UNCOMPRESSED"
         override val coin = coinType

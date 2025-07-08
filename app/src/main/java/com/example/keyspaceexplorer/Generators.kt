@@ -18,7 +18,7 @@ object LegacyUncompressedUtils {
         return pubKeyToP2PKH(pubKey, netVersion)
     }
 
-    fun pubKeyToP2PKH(pubKey: ByteArray, netVersion: Byte = 0x00): String {
+    private fun pubKeyToP2PKH(pubKey: ByteArray, netVersion: Byte = 0x00): String {
         val sha256 = MessageDigest.getInstance("SHA-256").digest(pubKey)
         val ripemd160 = RIPEMD160Digest().apply { update(sha256, 0, sha256.size) }
         val out = ByteArray(20)

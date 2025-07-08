@@ -15,9 +15,9 @@ import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
 
-    val viewModel = KeyspaceViewModel(KeyspaceRepository(RedisService()))
+    private val viewModel = KeyspaceViewModel(KeyspaceRepository())
 
-    val DarkColorScheme = darkColorScheme(
+    private val DarkColorScheme = darkColorScheme(
         background = Color.Black,
         onBackground = Color.White,
         surface = Color.DarkGray,

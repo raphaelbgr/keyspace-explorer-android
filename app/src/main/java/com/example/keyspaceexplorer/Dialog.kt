@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -115,7 +116,7 @@ fun KeyDetailDialog(
                                     modifier = Modifier
                                         .padding(start = 4.dp)
                                         .clickable { expandedIndex = !expandedIndex },
-                                    color = Color.Yellow,
+                                    color = Color.Gray,
                                     fontSize = 12.sp
                                 )
                             }
@@ -142,7 +143,7 @@ fun KeyDetailDialog(
                                     modifier = Modifier
                                         .padding(start = 4.dp)
                                         .clickable { expandedPage = !expandedPage },
-                                    color = Color.Yellow,
+                                    color = Color.Green,
                                     fontSize = 12.sp
                                 )
                             }
@@ -186,10 +187,15 @@ fun KeyDetailDialog(
                     }
 
                     items(item.addresses) { addr ->
+                        val isMatched = item.matched?.any { it.address == addr.address && it.token == addr.token } == true
+
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
+                                .then(
+                                    if (isMatched) Modifier.background(Color(0xFFB6F7C1)) else Modifier
+                                )
                                 .clickable {
                                     val clip = ClipData.newPlainText("Wallet Address", addr.address)
                                     clipboardManager.setPrimaryClip(clip)
@@ -201,13 +207,18 @@ fun KeyDetailDialog(
                                         )
                                         .show()
                                 },
-                            elevation = CardDefaults.cardElevation(2.dp)
+                            elevation = CardDefaults.cardElevation(2.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
+                            border = if (isMatched) BorderStroke(2.dp, Color.Green) else null,
+                            shape = RoundedCornerShape(8.dp),
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text(
-                                    text = if (addr.variantPretty()
-                                            .isNotEmpty()
-                                    ) "[${addr.token}//${addr.variantPretty()}]" else "[${addr.token}]",
+                                    text = if (addr.variantPretty().isNotEmpty())
+                                        "[${addr.token}//${addr.variantPretty()}]"
+                                    else "[${addr.token}]",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 10.sp
                                 )
@@ -281,12 +292,22 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
                             .fillMaxWidth()
                     ) {
                         items(matches) { item ->
+                            val matchHighlightColor = Color.Gray // fundo opcional verde-claro
+                            val isMatched = item.matched?.isNotEmpty() == true
+
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
+                                    .then(
+                                        if (isMatched) Modifier.background(matchHighlightColor) else Modifier
+                                    )
                                     .clickable { onSelect(item) },
-                                elevation = CardDefaults.cardElevation(2.dp)
+                                elevation = CardDefaults.cardElevation(2.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                )
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
                                     Text(
@@ -294,7 +315,12 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 12.sp
                                     )
-                                    Text(
+                                    item.matched?.forEach {
+                                        Text(
+                                            "✅ ${it.address} (${it.token}/${it.variantPretty()})",
+                                            fontSize = 10.sp
+                                        )
+                                    } ?: Text(
                                         "📬 ${item.addresses.firstOrNull()?.address ?: "..."}",
                                         fontSize = 10.sp
                                     )

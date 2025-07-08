@@ -3,7 +3,7 @@ package com.example.keyspaceexplorer
 import com.example.keyspaceexplorer.TokenConfig.TOKENS
 import java.math.BigInteger
 
-class KeyspaceRepository(private val redisService: RedisService) {
+class KeyspaceRepository {
 
     fun generateBatch(startIndex: BigInteger, count: Int): List<PrivateKeyItem> {
         val list = mutableListOf<PrivateKeyItem>()

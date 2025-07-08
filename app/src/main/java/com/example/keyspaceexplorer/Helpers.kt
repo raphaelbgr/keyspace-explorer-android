@@ -19,6 +19,18 @@ import org.bouncycastle.crypto.digests.RIPEMD160Digest
 import java.io.IOException
 import java.security.MessageDigest
 
+fun formatMatchMessage(item: PrivateKeyItem): String {
+    return buildString {
+        appendLine("🔐 Chave Privada:")
+        appendLine("   ${item.hex}")
+        appendLine()
+        appendLine("📬 Endereço(s) que deu match:")
+        item.matched?.forEach { address ->
+            appendLine(address.fullAddressPretty())
+        }
+    }.trim()
+}
+
 object AlertHelper {
     fun alertMatch(item: PrivateKeyItem) {
         try {
@@ -27,15 +39,15 @@ object AlertHelper {
                     appendLine("🔐 Chave Privada:")
                     appendLine("   ${item.hex}")
                     appendLine()
-                    appendLine("📬 Endereços derivadas:")
-                    item.addresses.forEach { address ->
-                        appendLine("   $address")
+                    appendLine("📬 Endereço(s) que deu match:")
+                    item.matched?.forEach { address ->
+                        appendLine(address.fullAddressPretty())
                     }
                 }
 
                 MainActivity.Instance?.context?.let {
                     AlertDialog.Builder(it)
-                        .setTitle("✅ Match encontrado no banco!")
+                        .setTitle("✅ Match encontrado no banco e salvo em meus matches!")
                         .setMessage(message)
                         .setPositiveButton("OK", null)
                         .show()
@@ -53,7 +65,7 @@ object TelegramHelper {
 
     fun sendAlert(item: PrivateKeyItem) {
         try {
-            val body = "Chave privada encontrada!\nPrivKey: ${item.hex}\nAddress: ${item.addresses.joinToString()}"
+            val body = formatMatchMessage(item)
             val form = FormBody.Builder()
                 .add("chat_id", TELEGRAM_ID)
                 .add("text", body)
@@ -107,14 +119,23 @@ object StorageHelper {
             emptyList()
         }
     }
+
+    fun alreadySaved(item: PrivateKeyItem): Boolean {
+        return try {
+            val saved = getMatches()
+            saved.any { it.hex == item.hex }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }
 
 object LogHelper {
     fun logMatch(item: PrivateKeyItem) {
         try {
-            for (i in 1..100) {
-                Log.d("MATCH", "MATCH FOUND -> $item")
-            }
+            val message = formatMatchMessage(item)
+            Log.d("MATCH", "\n$message")
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -124,7 +145,8 @@ object LogHelper {
 object ToastHelper {
     fun showToast(item: PrivateKeyItem) {
         try {
-            Toast.makeText(MainActivity.Instance.context, "Match encontrado! -> $item", Toast.LENGTH_LONG).show()
+            val msg = "Match: ${item.matched?.firstOrNull()?.address ?: "?"}"
+            Toast.makeText(MainActivity.Instance.context, msg, Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             e.printStackTrace()
         }

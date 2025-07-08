@@ -1,9 +1,9 @@
 package com.example.keyspaceexplorer
 
 import android.os.Build
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.keyspaceexplorer.AddressUtils.normalize
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,26 +46,37 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
 
     private suspend fun checkMatches(batch: List<PrivateKeyItem>): List<PrivateKeyItem> {
         val allAddresses = batch.flatMap { it.addresses }
-        val matches = redisService.checkMatches(allAddresses)
+        allAddresses.map { it.address = normalizeAddress(it.address, it.token) }
 
+        // Obtem os endereços normalizados que deram match
+        val matchedSet = redisService.checkMatches(allAddresses)
+
+        // Atualiza cada item com matched e dbHit
         val updatedBatch = batch.map { item ->
-            val hasHit = item.addresses.any { addr ->
-                normalize(addr.address, addr.token) in matches
+            val matched = item.addresses.filter {
+                normalizeAddress(it.address, it.token) in matchedSet
             }
-            item.dbHit = hasHit
+            item.dbHit = matched.isNotEmpty()
+            item.matched = matched
             item
         }
 
+        // Executa alertas e persistência para os que tiveram hit
         val found = updatedBatch.filter { it.dbHit == true }
         found.forEach {
-            AlertHelper.alertMatch(it)
-            StorageHelper.saveMatch(it)
-            TelegramHelper.sendAlert(it)
-            LogHelper.logMatch(it)
-            ToastHelper.showToast(it)
+            val alreadyExists = StorageHelper.alreadySaved(it)
+            if (!alreadyExists) {
+                AlertHelper.alertMatch(it)
+                StorageHelper.saveMatch(it)
+                TelegramHelper.sendAlert(it)
+                LogHelper.logMatch(it)
+                ToastHelper.showToast(it)
+            } else {
+                Log.d("MATCH", "🔁 Match duplicado ignorado: ${it.hex}")
+            }
         }
 
-        _scannedAddressesCount.value += batch.flatMap { it.addresses }.size
+        _scannedAddressesCount.value += allAddresses.size
 
         return updatedBatch
     }
