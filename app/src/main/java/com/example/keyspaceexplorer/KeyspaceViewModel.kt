@@ -1,6 +1,5 @@
 package com.example.keyspaceexplorer
 
-import android.os.Build
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -136,11 +135,9 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     fun estimatePage(progress: Float): BigInteger {
-        val totalKeys = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            BigInteger.TWO.pow(bitLength.value)
-        } else {
-            TODO("VERSION.SDK_INT < TIRAMISU")
-        }
+        val bitLen = bitLength.value  // Se bitLength for um `State<Int>`
+        val totalKeys = BigInteger.TWO.pow(bitLen)
+
         return (totalKeys.toBigDecimal() * progress.toBigDecimal())
             .toBigInteger()
             .divide(BigInteger.valueOf(MainActivity.Instance.batchSize.toLong()))
