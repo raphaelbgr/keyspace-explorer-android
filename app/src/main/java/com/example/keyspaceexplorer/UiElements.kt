@@ -225,13 +225,13 @@ fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
                     )
                     if (address.balanceToken > 0.0) {
                         Text(
-                            "💰 ${address.balanceToken} ${address.token} ($${"%.2f".format(address.balanceUsd)})",
+                            text = "💰 ${address.balanceTokenFormatted} ${address.token} ($${"%.2f".format(address.balanceUsd)})",
                             fontSize = 13.sp,
                             color = Color(0xFFFFD700)
                         )
                     } else {
                         Text(
-                            "💰 0 ${address.token}",
+                            text = "💰 0 ${address.token}",
                             fontSize = 12.sp,
                             color = Color.LightGray
                         )
@@ -340,11 +340,13 @@ fun PreviewKeyItemCard() {
         addresses = listOf(
             CryptoAddress(token = "BTC", variant = "P2PKH", address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
                 balanceToken = 1.0,
+                balanceTokenFormatted = "1.00000000",
                 balanceUsd = 100000.0
                 ),
             CryptoAddress(
                 token = "BTC", variant = "P2SH", address = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
                 balanceToken = 2.0,
+                balanceTokenFormatted = "2.00000000",
                 balanceUsd = 200000.0
             )
         ),

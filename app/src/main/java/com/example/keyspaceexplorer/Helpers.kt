@@ -104,6 +104,26 @@ object StorageHelper {
         }
     }
 
+    @SuppressLint("MutatingSharedPrefs", "UseKtx")
+    fun updateMatch(item: PrivateKeyItem) {
+        try {
+            val prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.Instance.context)
+            val current = getMatches(prefs).toMutableList()
+
+            val index = current.indexOfFirst { it.hex == item.hex }
+            if (index != -1) {
+                current[index] = item // atualiza se já existe
+            } else {
+                current.add(item) // adiciona se não existe
+            }
+
+            val json = gson.toJson(current)
+            prefs.edit().putString(MATCHES_KEY, json).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun getMatches(): List<PrivateKeyItem> {
         val prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.Instance.context)
         return getMatches(prefs)
@@ -122,10 +142,22 @@ object StorageHelper {
         }
     }
 
-    fun alreadySaved(item: PrivateKeyItem): Boolean {
+    fun alreadySavedAndUpdate(item: PrivateKeyItem): Boolean {
         return try {
-            val saved = getMatches()
-            saved.any { it.hex == item.hex }
+            val saved = getMatches().toMutableList()
+            val index = saved.indexOfFirst { it.hex == item.hex }
+
+            val existed = index != -1
+            if (existed) {
+                saved[index] = item // atualiza
+            } else {
+                saved.add(item) // adiciona
+            }
+
+            saved.forEach {
+                saveMatch(it)
+            }
+            existed
         } catch (e: Exception) {
             e.printStackTrace()
             false
@@ -203,6 +235,7 @@ object MatchFetcher {
                             listOf(CryptoAddress(
                                 token, "?", address,
                                 balanceToken = 0.0,
+                                balanceTokenFormatted = "0.00000000",
                                 balanceUsd = 0.0,
                             ))
                         } else emptyList()
@@ -282,6 +315,7 @@ object MatchFetcher {
                                 token = o.getString("token"),
                                 address = o.getString("address"),
                                 balance = o.getDouble("balance_token"),
+                                balanceFormatted = o.getString("balance_token_formatted"),
                                 balanceUsd = o.getDouble("balance_usd")
                             )
                         )
@@ -356,6 +390,7 @@ object MatchFetcher {
                         token = o.getString("token"),
                         address = o.getString("address"),
                         balance = o.getDouble("balance_token"),
+                        balanceFormatted = o.getString("balance_token_formatted"),
                         balanceUsd = o.getDouble("balance_usd")
                     )
                 )
@@ -390,7 +425,14 @@ object MatchFetcher {
                 val hex = obj.getString("private_key_hex")
 
                 val matched = if (!address.isNullOrBlank()) {
-                    listOf(CryptoAddress(token, variant, address, 0.0, 0.0))
+                    listOf(CryptoAddress(
+                        token = token,
+                        variant = variant,
+                        address = address,
+                        balanceToken = 0.0,
+                        balanceUsd = 0.0,
+                        balanceTokenFormatted = "0.00000000"
+                    ))
                 } else emptyList()
 
                 val item = PrivateKeyItem(
@@ -416,6 +458,7 @@ object MatchFetcher {
                 if (info != null) {
                     match.balanceToken = info.balance
                     match.balanceUsd = info.balanceUsd
+                    match.balanceTokenFormatted = info.balanceFormatted
                 }
             }
 
@@ -430,6 +473,7 @@ object MatchFetcher {
         val token: String,
         val address: String,
         val balance: Double,
+        val balanceFormatted: String,
         val balanceUsd: Double
     )
 }

@@ -50,6 +50,7 @@ class KeyspaceRepository {
                                 variant = variant,
                                 address = address,
                                 balanceToken = 0.0,
+                                balanceTokenFormatted = "0.00000000",
                                 balanceUsd = 0.0,
                             )
                         )

@@ -472,6 +472,7 @@ fun PreviewKeyDetailDialog() {
                 variant = "P2PKH",
                 address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
                 balanceToken = 2.0,
+                balanceTokenFormatted = "2.00000000",
                 balanceUsd = 200000.0,
             ),
             CryptoAddress(
@@ -479,6 +480,7 @@ fun PreviewKeyDetailDialog() {
                 variant = "Bech32",
                 address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
                 balanceToken = 1.0,
+                balanceTokenFormatted = "1.00000000",
                 balanceUsd = 100000.0,
             ),
             CryptoAddress(
@@ -486,6 +488,7 @@ fun PreviewKeyDetailDialog() {
                 variant = "ETH",
                 address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
                 balanceToken = 1.0,
+                balanceTokenFormatted = "1.000000000000000000",
                 balanceUsd = 2500.0,
             )
         )

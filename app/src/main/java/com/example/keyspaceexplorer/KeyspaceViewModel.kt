@@ -81,6 +81,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
                     if (localItem != null && remoteItem.matched?.isNotEmpty() == true) {
                         localItem.matched?.getOrNull(0)?.apply {
                             balanceToken = remoteItem.matched!![0].balanceToken
+                            balanceTokenFormatted = remoteItem.matched!![0].balanceTokenFormatted
                             balanceUsd = remoteItem.matched!![0].balanceUsd
                         }
                     } else {
@@ -155,7 +156,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
             viewModelScope.launch(Dispatchers.IO) {
                 MatchFetcher.saveMatch(it)
             }
-            if (!StorageHelper.alreadySaved(it)) {
+            if (!StorageHelper.alreadySavedAndUpdate(it)) {
                 AlertHelper.alertMatch(it)
                 StorageHelper.saveMatch(it)
                 TelegramHelper.sendAlert(it)
@@ -180,6 +181,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
                 val balanceInfo = balances.find { it.address == match?.address }
                 if (match != null && balanceInfo != null) {
                     match.balanceToken = balanceInfo.balance
+                    match.balanceTokenFormatted = balanceInfo.balanceFormatted
                     match.balanceUsd = balanceInfo.balanceUsd
                 }
             }

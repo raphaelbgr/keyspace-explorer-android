@@ -15,6 +15,7 @@ data class CryptoAddress(
     var variant: String,      // Ex: "P2PKH", "Bech32", etc.
     var address: String,
     var balanceToken: Double,
+    var balanceTokenFormatted: String,
     var balanceUsd: Double,
 ) {
     fun variantPretty() = when (this.variant) {
