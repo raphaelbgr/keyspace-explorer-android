@@ -66,18 +66,35 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
 
     fun syncMatches() {
         Log.d("MATCH", "Sincronizando matches...")
-        viewModelScope.launch {
-            StorageHelper.getMatches().forEach {
-                MatchFetcher.saveMatch(it)
-                Log.d("MATCH", "MatchFetcher.saveMatch...")
-            }
-        }
-        viewModelScope.launch {
-            MatchFetcher.fetchMatchesWithBalances {
-                it.forEach { item ->
-                    StorageHelper.saveMatch(item)
-                    Log.d("MATCH", "StorageHelper.saveMatch...")
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 1. Pega do backend (com saldo)
+                val remoteMatches = MatchFetcher.fetchMatchesWithBalancesBlocking()
+
+                // 2. Pega os que já estão salvos localmente
+                val localMatches = StorageHelper.getMatches().associateBy { it.hex }.toMutableMap()
+
+                // 3. Atualiza saldo se já existe local
+                for (remoteItem in remoteMatches) {
+                    val localItem = localMatches[remoteItem.hex]
+                    if (localItem != null && remoteItem.matched?.isNotEmpty() == true) {
+                        localItem.matched?.getOrNull(0)?.apply {
+                            balanceToken = remoteItem.matched!![0].balanceToken
+                            balanceUsd = remoteItem.matched!![0].balanceUsd
+                        }
+                    } else {
+                        // Novo item remoto → adiciona
+                        localMatches[remoteItem.hex] = remoteItem
+                    }
                 }
+
+                // 4. Salva tudo novamente (sem duplicar)
+                localMatches.values.forEach { StorageHelper.saveMatch(it) }
+
+                Log.d("MATCH", "Sincronização concluída: ${localMatches.size} itens no total.")
+            } catch (e: Exception) {
+                Log.e("MATCH", "Erro ao sincronizar matches com saldo:", e)
             }
         }
     }
@@ -148,6 +165,24 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         }
 
         _scannedAddressesCount.value += allAddresses.size
+
+        // 🔁 Consulta saldo dos matches encontrados
+        val addressesToCheck = updatedBatch
+            .filter { it.dbHit == true }
+            .mapNotNull { it.matched?.firstOrNull()?.address }
+
+        if (addressesToCheck.isNotEmpty()) {
+            val balances = MatchFetcher.fetchBalancesBlocking(addressesToCheck)
+            updatedBatch.forEach { item ->
+                val match = item.matched?.firstOrNull()
+                val balanceInfo = balances.find { it.address == match?.address }
+                if (match != null && balanceInfo != null) {
+                    match.balanceToken = balanceInfo.balance
+                    match.balanceUsd = balanceInfo.balanceUsd
+                }
+            }
+        }
+
         return updatedBatch
     }
 

@@ -167,7 +167,10 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
 @Composable
 fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(4.dp).clickable { onClick() },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(4.dp)
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
@@ -181,12 +184,46 @@ fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
                 false -> Color.Gray
                 null -> Color.LightGray
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Index: ${item.index.toScientificNotation()}", fontWeight = FontWeight.Bold)
                     Text("🔑: ...${item.hex.takeLast(6)}", fontSize = 12.sp)
                 }
-                Text(dbStatusEmoji, fontSize = 18.sp, color = dbStatusColor, modifier = Modifier.align(Alignment.CenterVertically))
+                Text(
+                    dbStatusEmoji,
+                    fontSize = 18.sp,
+                    color = dbStatusColor,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
+            }
+
+            // 🔁 Mostrar matched com saldo
+            item.matched?.forEach { address ->
+                Spacer(modifier = Modifier.height(6.dp))
+                Column {
+                    Text(
+                        address.fullAddressPretty(),
+                        fontSize = 13.sp,
+                        color = Color.White
+                    )
+                    if (address.balanceToken > 0.0) {
+                        Text(
+                            "💰 ${address.balanceToken} ${address.token} ($${"%.2f".format(address.balanceUsd)})",
+                            fontSize = 13.sp,
+                            color = Color(0xFFFFD700)
+                        )
+                    } else {
+                        Text(
+                            "💰 0 ${address.token}",
+                            fontSize = 12.sp,
+                            color = Color.LightGray
+                        )
+                    }
+                }
             }
         }
     }

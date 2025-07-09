@@ -333,6 +333,99 @@ object MatchFetcher {
         }
     }
 
+    fun fetchBalancesBlocking(addresses: List<String>): List<BalanceResult> {
+        val client = OkHttpClient()
+        val jsonBody = JSONObject().put("addresses", JSONArray(addresses))
+
+        val request = Request.Builder()
+            .url("http://192.168.7.101:5000/balances")
+            .post(RequestBody.create("application/json".toMediaTypeOrNull(), jsonBody.toString()))
+            .build()
+
+        return try {
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: return emptyList()
+            if (!response.isSuccessful) return emptyList()
+
+            val array = JSONObject(body).getJSONArray("matches")
+            val result = mutableListOf<BalanceResult>()
+            for (i in 0 until array.length()) {
+                val o = array.getJSONObject(i)
+                result.add(
+                    BalanceResult(
+                        token = o.getString("token"),
+                        address = o.getString("address"),
+                        balance = o.getDouble("balance_token"),
+                        balanceUsd = o.getDouble("balance_usd")
+                    )
+                )
+            }
+            result
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    fun fetchMatchesWithBalancesBlocking(): List<PrivateKeyItem> {
+        val client = OkHttpClient()
+        val request = Request.Builder()
+            .url("http://192.168.7.101:5000/matches")
+            .build()
+
+        return try {
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return emptyList()
+
+            val body = response.body?.string() ?: return emptyList()
+            val matchArray = JSONObject(body).getJSONArray("matches")
+            val addressList = mutableListOf<String>()
+            val hexToItem = mutableMapOf<String, PrivateKeyItem>()
+
+            for (i in 0 until matchArray.length()) {
+                val obj = matchArray.getJSONObject(i)
+                val token = obj.getString("token")
+                val address = obj.optString("address", null)
+                val variant = obj.optString("variant", "?")
+                val hex = obj.getString("private_key_hex")
+
+                val matched = if (!address.isNullOrBlank()) {
+                    listOf(CryptoAddress(token, variant, address, 0.0, 0.0))
+                } else emptyList()
+
+                val item = PrivateKeyItem(
+                    index = BigInteger.ZERO,
+                    hex = hex,
+                    addresses = emptyList(),
+                    dbHit = true,
+                    matched = matched
+                )
+
+                if (address != null) {
+                    addressList.add(address)
+                    hexToItem[hex] = item
+                }
+            }
+
+            // Consulta saldos
+            val balances = fetchBalancesBlocking(addressList)
+
+            for ((_, item) in hexToItem) {
+                val match = item.matched?.firstOrNull() ?: continue
+                val info = balances.find { it.address == match.address }
+                if (info != null) {
+                    match.balanceToken = info.balance
+                    match.balanceUsd = info.balanceUsd
+                }
+            }
+
+            return hexToItem.values.toList()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return emptyList()
+        }
+    }
+
     data class BalanceResult(
         val token: String,
         val address: String,
