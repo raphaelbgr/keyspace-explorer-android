@@ -5,7 +5,7 @@ import java.math.BigInteger
 data class PrivateKeyItem(
     val index: BigInteger,
     val hex: String,
-    val addresses: List<CryptoAddress>,
+    var addresses: List<CryptoAddress>,
     var dbHit: Boolean? = null,
     var matched: List<CryptoAddress>? = null,
 )
@@ -48,14 +48,6 @@ sealed class CoinVariant {
     data class UncompressedVariant(val coinType: String) : CoinVariant() {
         override val name = "UNCOMPRESSED"
         override val coin = coinType
-    }
-}
-
-fun normalizeAddress(address: String, coin: String): String {
-    return when (coin) {
-        "ETH" -> address.lowercase().removePrefix("0x")
-        "BCH" -> address.removePrefix("bitcoincash:")
-        else -> address
     }
 }
 

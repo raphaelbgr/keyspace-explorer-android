@@ -140,13 +140,13 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
 
     private suspend fun checkMatches(batch: List<PrivateKeyItem>): List<PrivateKeyItem> {
         val allAddresses = batch.flatMap { it.addresses }
-        allAddresses.forEach { it.address = normalizeAddress(it.address, it.token) }
+        allAddresses.forEach { it.address = repository.normalizeAddress(it.address, it.token) }
 
         val matchedSet = redisService.checkMatches(allAddresses)
         _currentBackgroundScanCount.value += allAddresses.size
 
         val updatedBatch = batch.map { item ->
-            val matched = item.addresses.filter { normalizeAddress(it.address, it.token) in matchedSet }
+            val matched = item.addresses.filter { repository.normalizeAddress(it.address, it.token) in matchedSet }
             item.dbHit = matched.isNotEmpty()
             item.matched = matched
             item

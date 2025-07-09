@@ -64,6 +64,13 @@ fun KeyDetailDialog(
     existsInDb: Boolean?,
     onDismiss: () -> Unit
 ) {
+
+    // Encontrado em outro app e exibido via banco de dados
+    if (item.index == BigInteger.ZERO) {
+        item.addresses = KeyspaceRepository().deriveAllFromHex(hex = item.hex, normalize = true)
+    }
+
+
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val scope = rememberCoroutineScope()
