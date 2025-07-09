@@ -202,7 +202,6 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     private fun loadNextBatch() {
         viewModelScope.launch(Dispatchers.Default) {
             try {
-                if (_loading.value) return@launch
                 _loading.value = true
 
                 val params = ScanParams(

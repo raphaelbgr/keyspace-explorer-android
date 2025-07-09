@@ -122,8 +122,6 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
                 sliderValueDecimal = newDecimal
                 if (scanOnDrag) {
                     viewModel.slideToProgressInRange(sliderNormalized.toFloat())
-                } else {
-                    viewModel.setLoading(true)
                 }
             },
             onValueChangeFinished = {
