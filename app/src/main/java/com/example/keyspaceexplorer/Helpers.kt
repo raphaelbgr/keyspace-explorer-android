@@ -142,22 +142,10 @@ object StorageHelper {
         }
     }
 
-    fun alreadySavedAndUpdate(item: PrivateKeyItem): Boolean {
+    fun alreadySaved(item: PrivateKeyItem): Boolean {
         return try {
-            val saved = getMatches().toMutableList()
-            val index = saved.indexOfFirst { it.hex == item.hex }
-
-            val existed = index != -1
-            if (existed) {
-                saved[index] = item // atualiza
-            } else {
-                saved.add(item) // adiciona
-            }
-
-            saved.forEach {
-                saveMatch(it)
-            }
-            existed
+            val saved = getMatches()
+            saved.any { it.hex == item.hex }
         } catch (e: Exception) {
             e.printStackTrace()
             false

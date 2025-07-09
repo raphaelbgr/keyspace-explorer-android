@@ -336,15 +336,26 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 12.sp
                                     )
-                                    item.matched?.forEach {
-                                        Text(
-                                            "✅ ${it.address} (${it.token}/${it.variantPretty()})",
-                                            fontSize = 10.sp
-                                        )
-                                    } ?: Text(
-                                        "📬 ${item.addresses.firstOrNull()?.address ?: "..."}",
-                                        fontSize = 10.sp
-                                    )
+                                    item.matched?.forEach { address ->
+                                        val hasBalance = address.balanceToken > 0.0
+                                        val balanceText = if (hasBalance) {
+                                            "💰 ${address.balanceTokenFormatted} ${address.token} ($${"%.2f".format(address.balanceUsd)})"
+                                        } else {
+                                            "💰 0 ${address.token}"
+                                        }
+
+                                        Column {
+                                            Text(
+                                                "✅ ${address.address} (${address.token}/${address.variantPretty()})",
+                                                fontSize = 10.sp
+                                            )
+                                            Text(
+                                                text = balanceText,
+                                                fontSize = 10.sp,
+                                                color = if (hasBalance) Color(0xFFFFD700) else Color.LightGray
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

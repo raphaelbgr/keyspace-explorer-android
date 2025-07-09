@@ -91,7 +91,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
                 }
 
                 // 4. Salva tudo novamente (sem duplicar)
-                localMatches.values.forEach { StorageHelper.saveMatch(it) }
+                localMatches.values.forEach { StorageHelper.updateMatch(it) }
 
                 Log.d("MATCH", "Sincronização concluída: ${localMatches.size} itens no total.")
             } catch (e: Exception) {
@@ -156,7 +156,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
             viewModelScope.launch(Dispatchers.IO) {
                 MatchFetcher.saveMatch(it)
             }
-            if (!StorageHelper.alreadySavedAndUpdate(it)) {
+            if (!StorageHelper.alreadySaved(it)) {
                 AlertHelper.alertMatch(it)
                 StorageHelper.saveMatch(it)
                 TelegramHelper.sendAlert(it)
