@@ -66,6 +66,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.syncMatches()
+    }
+
     override fun dispatchGenericMotionEvent(ev: MotionEvent?): Boolean {
         if (ev?.action == MotionEvent.ACTION_HOVER_MOVE ||
             ev?.action == MotionEvent.ACTION_HOVER_ENTER ||

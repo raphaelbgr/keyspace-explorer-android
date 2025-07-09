@@ -64,6 +64,24 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         loadNextBatch()
     }
 
+    fun syncMatches() {
+        Log.d("MATCH", "Sincronizando matches...")
+        viewModelScope.launch {
+            StorageHelper.getMatches().forEach {
+                MatchFetcher.saveMatch(it)
+                Log.d("MATCH", "MatchFetcher.saveMatch...")
+            }
+        }
+        viewModelScope.launch {
+            MatchFetcher.fetchMatchesWithBalances {
+                it.forEach { item ->
+                    StorageHelper.saveMatch(item)
+                    Log.d("MATCH", "StorageHelper.saveMatch...")
+                }
+            }
+        }
+    }
+
     fun updateKeyspaceRange(start: BigInteger, end: BigInteger, retainProgress: Boolean = true) {
         val previousProgress = if (retainProgress) calculateRelativeProgress().toBigDecimal() else BigDecimal.ZERO
 
@@ -117,6 +135,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         }
 
         updatedBatch.filter { it.dbHit == true }.forEach {
+            MatchFetcher.saveMatch(it)
             if (!StorageHelper.alreadySaved(it)) {
                 AlertHelper.alertMatch(it)
                 StorageHelper.saveMatch(it)

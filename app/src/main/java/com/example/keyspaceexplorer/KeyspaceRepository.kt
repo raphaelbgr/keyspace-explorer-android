@@ -48,6 +48,8 @@ class KeyspaceRepository {
                                 token = token,
                                 variant = variant,
                                 address = address,
+                                balanceToken = 0.0,
+                                balanceUsd = 0.0,
                             )
                         )
                     }
@@ -58,10 +60,5 @@ class KeyspaceRepository {
         }
 
         return list
-    }
-
-    fun progressToIndex(progress: Double): BigInteger {
-        val max = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140", 16)
-        return (max.toBigDecimal() * progress.toBigDecimal()).toBigInteger()
     }
 }

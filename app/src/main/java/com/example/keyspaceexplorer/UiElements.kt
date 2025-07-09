@@ -288,8 +288,15 @@ fun PreviewKeyItemCard() {
         index = BigInteger("12345678901234567890"),
         hex = "0000000000000000000000000000000000000000000000000000000000000001",
         addresses = listOf(
-            CryptoAddress(token = "BTC", variant = "P2PKH", address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"),
-            CryptoAddress(token = "BTC", variant = "P2SH", address = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy")
+            CryptoAddress(token = "BTC", variant = "P2PKH", address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+                balanceToken = 1.0,
+                balanceUsd = 100000.0
+                ),
+            CryptoAddress(
+                token = "BTC", variant = "P2SH", address = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+                balanceToken = 2.0,
+                balanceUsd = 200000.0
+            )
         ),
         dbHit = true
     )

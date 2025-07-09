@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -103,7 +104,7 @@ fun KeyDetailDialog(
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInteropFilter {
-                            it.action == android.view.MotionEvent.ACTION_HOVER_EXIT
+                            it.action == MotionEvent.ACTION_HOVER_EXIT
                         }
                 ) {
                     item {
@@ -294,7 +295,7 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
                 modifier = Modifier
                     .padding(16.dp)
                     .pointerInteropFilter {
-                        it.action == android.view.MotionEvent.ACTION_HOVER_EXIT
+                        it.action == MotionEvent.ACTION_HOVER_EXIT
                     }
             ) {
                 Text("✅ Matches Encontrados", fontWeight = FontWeight.Bold, fontSize = 20.sp)
@@ -467,16 +468,22 @@ fun PreviewKeyDetailDialog() {
                 token = "BTC",
                 variant = "P2PKH",
                 address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+                balanceToken = 2.0,
+                balanceUsd = 200000.0,
             ),
             CryptoAddress(
                 token = "BTC",
                 variant = "Bech32",
                 address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+                balanceToken = 1.0,
+                balanceUsd = 100000.0,
             ),
             CryptoAddress(
                 token = "ETH",
                 variant = "ETH",
                 address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+                balanceToken = 1.0,
+                balanceUsd = 2500.0,
             )
         )
     )

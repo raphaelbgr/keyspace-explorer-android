@@ -78,6 +78,12 @@ fun ManualScanDialog(
                     }) {
                         Text("➡️ Para frente")
                     }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Button(onClick = {
                         val qty = quantityText.toIntOrNull() ?: 0
                         if (qty > 0) onScanRequested(ScanDirection.BOTH, qty, repeatRandom)
@@ -94,7 +100,7 @@ fun ManualScanDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Esconder")
             }
         })
 }

@@ -11,9 +11,11 @@ data class PrivateKeyItem(
 )
 
 data class CryptoAddress(
-    val token: String,        // Ex: "BTC", "ETH"
-    val variant: String,      // Ex: "P2PKH", "Bech32", etc.
+    var token: String,        // Ex: "BTC", "ETH"
+    var variant: String,      // Ex: "P2PKH", "Bech32", etc.
     var address: String,
+    var balanceToken: Double,
+    var balanceUsd: Double,
 ) {
     fun variantPretty() = when (this.variant) {
         "P2PKH" -> "compressed"

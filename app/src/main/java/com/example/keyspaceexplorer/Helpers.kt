@@ -11,13 +11,15 @@ import com.google.gson.reflect.TypeToken
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.Response
-import org.bitcoinj.core.Base58
-import org.bouncycastle.crypto.digests.RIPEMD160Digest
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.IOException
-import java.security.MessageDigest
+import java.math.BigInteger
 
 fun formatMatchMessage(item: PrivateKeyItem): String {
     return buildString {
@@ -83,7 +85,7 @@ object TelegramHelper {
 
 object StorageHelper {
     private val gson = Gson()
-    private const val MATCHES_KEY = "matches"
+    const val MATCHES_KEY = "matches"
 
     @SuppressLint("MutatingSharedPrefs", "UseKtx")
     fun saveMatch(item: PrivateKeyItem) {
@@ -107,7 +109,7 @@ object StorageHelper {
         return getMatches(prefs)
     }
 
-    private fun getMatches(prefs: SharedPreferences): List<PrivateKeyItem> {
+    fun getMatches(prefs: SharedPreferences): List<PrivateKeyItem> {
         return try {
             val json = prefs.getString(MATCHES_KEY, null)
             if (json != null) {
@@ -155,30 +157,6 @@ object ToastHelper {
 
 object AddressUtils {
 
-    fun pubKeyToAddress(pubKey: ByteArray): String {
-        // 1. SHA-256
-        val sha256 = MessageDigest.getInstance("SHA-256").digest(pubKey)
-
-        // 2. RIPEMD-160
-        val ripemd160 = RIPEMD160Digest().apply { update(sha256, 0, sha256.size) }
-        val hash160 = ByteArray(20)
-        ripemd160.doFinal(hash160, 0)
-
-        // 3. Prefix (0x00 para BTC mainnet P2PKH)
-        val prefix = byteArrayOf(0x00)
-
-        // 4. Payload
-        val payload = prefix + hash160
-
-        // 5. Checksum = SHA256(SHA256(payload)).take(4)
-        val checksum = MessageDigest.getInstance("SHA-256").digest(
-            MessageDigest.getInstance("SHA-256").digest(payload)
-        ).take(4).toByteArray()
-
-        // 6. Base58(Payload + Checksum)
-        return Base58.encode(payload + checksum)
-    }
-
     fun normalize(address: String, coin: String): String {
         return when (coin.uppercase()) {
             "ETH" -> address.lowercase().removePrefix("0x")
@@ -186,4 +164,179 @@ object AddressUtils {
             else -> address
         }
     }
+}
+
+object MatchFetcher {
+    private val client = OkHttpClient()
+
+    fun fetchMatchesWithBalances(onResult: (List<PrivateKeyItem>) -> Unit) {
+        val request = Request.Builder()
+            .url("http://192.168.7.101:5000/matches")
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                e.printStackTrace()
+                onResult(emptyList())
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val body = response.body?.string()
+                if (!response.isSuccessful || body == null) {
+                    onResult(emptyList())
+                    return
+                }
+
+                try {
+                    val json = JSONObject(body)
+                    val matchArray = json.getJSONArray("matches")
+                    val addressList = mutableListOf<String>()
+                    val addressToItem = mutableMapOf<String, PrivateKeyItem>()
+
+                    for (i in 0 until matchArray.length()) {
+                        val obj = matchArray.getJSONObject(i)
+                        val token = obj.getString("token")
+                        val address = obj.optString("address", null)
+                        val hex = obj.getString("private_key_hex")
+
+                        val matched = if (!address.isNullOrBlank()) {
+                            listOf(CryptoAddress(
+                                token, "?", address,
+                                balanceToken = 0.0,
+                                balanceUsd = 0.0,
+                            ))
+                        } else emptyList()
+
+                        val item = PrivateKeyItem(
+                            index = BigInteger.ZERO,
+                            hex = hex,
+                            addresses = emptyList(), // ou matched se quiser copiar
+                            dbHit = true,
+                            matched = matched
+                        )
+
+                        if (address != null) {
+                            addressList.add(address)
+                            addressToItem[address] = item
+                        } else {
+                            // usa índice como chave fake
+                            addressToItem["null-$i"] = item
+                        }
+                    }
+
+                    if (addressList.isNotEmpty()) {
+                        fetchBalances(addressList) { balances ->
+                            for (balance in balances) {
+                                val item = addressToItem[balance.address]
+                                val addr = item?.matched?.firstOrNull()
+                                if (addr != null) {
+                                    addr.address = balance.address
+                                    addr.token = balance.token
+                                    addr.apply {
+                                        balanceToken = balance.balance
+                                        balanceUsd = balance.balanceUsd
+                                    }
+                                }
+                            }
+                            onResult(addressToItem.values.toList())
+                        }
+                    } else {
+                        onResult(addressToItem.values.toList())
+                    }
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    onResult(emptyList())
+                }
+            }
+        })
+    }
+
+    private fun fetchBalances(addresses: List<String>, onResult: (List<BalanceResult>) -> Unit) {
+        val jsonBody = JSONObject().put("addresses", JSONArray(addresses))
+        val request = Request.Builder()
+            .url("http://192.168.7.101:5000/balances")
+            .post(RequestBody.create("application/json".toMediaTypeOrNull(), jsonBody.toString()))
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                e.printStackTrace()
+                onResult(emptyList())
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val body = response.body?.string()
+                if (!response.isSuccessful || body == null) {
+                    onResult(emptyList())
+                    return
+                }
+
+                try {
+                    val array = JSONObject(body).getJSONArray("matches")
+                    val result = mutableListOf<BalanceResult>()
+                    for (i in 0 until array.length()) {
+                        val o = array.getJSONObject(i)
+                        result.add(
+                            BalanceResult(
+                                token = o.getString("token"),
+                                address = o.getString("address"),
+                                balance = o.getDouble("balance_token"),
+                                balanceUsd = o.getDouble("balance_usd")
+                            )
+                        )
+                    }
+                    onResult(result)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    onResult(emptyList())
+                }
+            }
+        })
+    }
+
+    @SuppressLint("MutatingSharedPrefs", "UseKtx")
+    fun saveMatch(item: PrivateKeyItem) {
+        try {
+            // Também envia para o backend
+            val matched = item.matched?.firstOrNull()
+            if (matched != null) {
+                val json = JSONObject().apply {
+                    put("token", matched.token)
+                    put("address", matched.address)
+                    put("private_key_hex", item.hex)
+                    put("variant", matched.variantPretty().lowercase())
+                }
+
+                val request = Request.Builder()
+                    .url("http://192.168.7.101:5000/store-match")
+                    .post(RequestBody.create(
+                        "application/json".toMediaTypeOrNull(), json.toString()
+                    ))
+                    .build()
+
+                OkHttpClient().newCall(request).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        e.printStackTrace()
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        if (!response.isSuccessful) {
+                            Log.e("saveMatch", "Erro ao salvar no backend: ${response.code}")
+                        }
+                    }
+                })
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    data class BalanceResult(
+        val token: String,
+        val address: String,
+        val balance: Double,
+        val balanceUsd: Double
+    )
 }
