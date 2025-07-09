@@ -27,11 +27,23 @@ data class CryptoAddress(
         else -> ""
     }
 
-    fun fullAddressPretty(): String {
+    fun fullAddressWithVariant(): String {
         if (variantPretty().isEmpty()) {
-            return "[$token] $address"
+            return "[$token] ${fullAddress()}"
         } else {
-            return "[$token - ${variantPretty()}] $address"
+            return "[$token - ${variantPretty()}] ${fullAddress()}"
+        }
+    }
+
+    fun fullAddress(): String {
+        return denormalizeAddress(address, token)
+    }
+
+    fun denormalizeAddress(address: String, coin: String): String {
+        return when (coin.lowercase()) {
+            "eth" -> if (!address.startsWith("0x")) "0x${address.lowercase()}" else address.lowercase()
+            "bch" -> if (!address.startsWith("bitcoincash:")) "bitcoincash:$address" else address
+            else -> address
         }
     }
 }

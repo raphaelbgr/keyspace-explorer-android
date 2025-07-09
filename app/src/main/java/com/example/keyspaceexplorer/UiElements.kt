@@ -219,7 +219,7 @@ fun KeyItemCard(item: PrivateKeyItem, onClick: () -> Unit = {}) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Column {
                     Text(
-                        address.fullAddressPretty(),
+                        text = address.fullAddressWithVariant(),
                         fontSize = 13.sp,
                         color = Color.White
                     )

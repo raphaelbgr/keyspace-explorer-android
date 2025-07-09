@@ -92,14 +92,18 @@ fun KeyDetailDialog(
     val bitLength = index.bitLength()
 
     val fullText = buildString {
-        appendLine("🔢 Index: $index")
+        if (item.index == BigInteger.ZERO) {
+            appendLine("🔢 Index: Encontrado em outro app")
+        } else {
+            appendLine("🔢 Index: $index")
+        }
         appendLine("📄 Página: $pageNumber")
         appendLine("📦 Tamanho da Página: $batchSize")
         appendLine("📏 Bits: $bitLength")
         appendLine("🔑 Chave Privada (hex): ${item.hex}")
         appendLine("🗃️ Consulta no DB: $dbStatus")
         item.addresses.forEach {
-            appendLine("📬 [${it.token} - ${it.variant}] ${it.address}")
+            appendLine("📬 [${it.token} - ${it.variant}] ${it.fullAddress()}")
         }
     }
 
@@ -128,10 +132,17 @@ fun KeyDetailDialog(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "🔢 Index: ${if (expandedIndex || indexStr.length <= 6) indexStr else "$shortIndex..."}",
-                                modifier = Modifier.weight(1f)
-                            )
+                            if (item.index == BigInteger.ZERO) {
+                                Text(
+                                    text = "🔢 Index: Encontrado em outro app",
+                                    modifier = Modifier.weight(1f)
+                                )
+                            } else {
+                                Text(
+                                    text = "🔢 Index: ${if (expandedIndex || indexStr.length <= 6) indexStr else "$shortIndex..."}",
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                             if (indexStr.length > 6) {
                                 Text(
                                     text = if (expandedIndex) "[ocultar]" else "[expandir]",
@@ -218,12 +229,12 @@ fun KeyDetailDialog(
                                     if (isMatched) Modifier.background(Color(0xFFB6F7C1)) else Modifier
                                 )
                                 .clickable {
-                                    val clip = ClipData.newPlainText("Wallet Address", addr.address)
+                                    val clip = ClipData.newPlainText("Wallet Address", addr.fullAddress())
                                     clipboardManager.setPrimaryClip(clip)
                                     Toast
                                         .makeText(
                                             context,
-                                            "Endereço copiado: ${addr.address}",
+                                            "Endereço copiado: ${addr.fullAddress()}",
                                             Toast.LENGTH_SHORT
                                         )
                                         .show()
@@ -244,7 +255,7 @@ fun KeyDetailDialog(
                                     fontSize = 10.sp
                                 )
                                 Text(
-                                    text = addr.address,
+                                    text = addr.fullAddress(),
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 12.sp
                                 )
@@ -353,7 +364,7 @@ fun MatchesDialog(onDismiss: () -> Unit, onSelect: (PrivateKeyItem) -> Unit) {
 
                                         Column {
                                             Text(
-                                                "✅ ${address.address} (${address.token}/${address.variantPretty()})",
+                                                text = "✅ ${address.fullAddress()} (${address.token}/${address.variantPretty()})",
                                                 fontSize = 10.sp
                                             )
                                             Text(

@@ -28,7 +28,7 @@ fun formatMatchMessage(item: PrivateKeyItem): String {
         appendLine()
         appendLine("📬 Endereço(s) que deu match:")
         item.matched?.forEach { address ->
-            appendLine(address.fullAddressPretty())
+            appendLine(address.fullAddressWithVariant())
         }
     }.trim()
 }
@@ -43,7 +43,7 @@ object AlertHelper {
                     appendLine()
                     appendLine("📬 Endereço(s) que deu match:")
                     item.matched?.forEach { address ->
-                        appendLine(address.fullAddressPretty())
+                        appendLine(address.fullAddressWithVariant())
                     }
                 }
 
