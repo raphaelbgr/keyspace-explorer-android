@@ -20,6 +20,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.math.BigInteger
+import android.content.Context
+import android.os.PowerManager
 
 fun formatMatchMessage(item: PrivateKeyItem): String {
     return buildString {
@@ -335,4 +337,30 @@ object MatchFetcher {
         val balanceFormatted: String,
         val balanceUsd: Double
     )
+}
+
+object WakeLockHelper {
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    fun acquire(context: Context) {
+        if (wakeLock == null) {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "KeyspaceScanner::WakeLock"
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    }
+
+    fun release() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+            }
+        }
+        wakeLock = null
+    }
 }

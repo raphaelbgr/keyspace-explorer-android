@@ -299,8 +299,10 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         manualScanJob?.cancel()  // Cancela qualquer job anterior
         manualScanJob = viewModelScope.launch(Dispatchers.IO) {
             try {
+                MainActivity.Instance.context.let { WakeLockHelper.acquire(it!!)}
+
                 val actualRange = rangeEnd - rangeStart
-                var scanStart = when (direction) {
+                val scanStart = when (direction) {
                     ScanDirection.FORWARD -> _currentIndex.value
                     ScanDirection.BACKWARD -> (_currentIndex.value - BigInteger.valueOf(quantity.toLong())).coerceAtLeast(rangeStart)
                     ScanDirection.BOTH -> (_currentIndex.value - BigInteger.valueOf(quantity.toLong() / 2)).coerceAtLeast(rangeStart)
@@ -341,6 +343,8 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                WakeLockHelper.release()
             }
         }
     }
