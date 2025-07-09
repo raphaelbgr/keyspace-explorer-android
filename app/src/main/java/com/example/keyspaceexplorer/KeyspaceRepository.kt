@@ -1,5 +1,6 @@
 package com.example.keyspaceexplorer
 
+import android.util.Log
 import com.example.keyspaceexplorer.TokenConfig.TOKENS
 import java.math.BigInteger
 
@@ -36,7 +37,7 @@ class KeyspaceRepository {
                                 }
                                 bipClass?.derive(hex, coinVariant.coin)
                             } catch (e: Exception) {
-                                e.printStackTrace()
+                                Log.e("Derive", "Error deriving address: ${coinVariant.coin} - ${hex}")
                                 null
                             }
                         }

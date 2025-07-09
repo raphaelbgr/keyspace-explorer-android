@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
@@ -120,12 +121,12 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
                     .multiply(it.toBigDecimal(mathContext), mathContext)
                 sliderValueDecimal = newDecimal
                 if (scanOnDrag) {
-                    viewModel.setLoading(true)
                     viewModel.slideToProgressInRange(sliderNormalized.toFloat())
+                } else {
+                    viewModel.setLoading(true)
                 }
             },
             onValueChangeFinished = {
-                viewModel.setLoading(false)
                 viewModel.jumpToProgressInRange(sliderNormalized.toFloat())
             },
             modifier = Modifier.fillMaxWidth()
@@ -138,28 +139,42 @@ fun KeyspaceScreen(viewModel: KeyspaceViewModel) {
         }
 
         selectedItem?.let {
-            KeyDetailDialog(item = it, existsInDb = it.dbHit) { selectedItem = null }
+            IgnoreHoverWrapper {
+                KeyDetailDialog(item = it, existsInDb = it.dbHit) { selectedItem = null }
+            }
         }
 
         if (loading) LoadingView()
-        if (showMatches) MatchesDialog(onDismiss = { showMatches = false }, onSelect = { selectedItem = it; showMatches = false })
-        if (showScaleDialog) ScaleDialog(
-            onApply = { minBits, maxBits ->
-                val minValue = BigInteger.ONE.shiftLeft(minBits - 1)
-                val maxValue = BigInteger.ONE.shiftLeft(maxBits).subtract(BigInteger.ONE)
-                viewModel.updateKeyspaceRange(minValue, maxValue)
-                showScaleDialog = false
-            },
-            onCancel = { showScaleDialog = false }
-        )
+        if (showMatches) {
+            IgnoreHoverWrapper {
+                MatchesDialog(
+                    onDismiss = { showMatches = false },
+                    onSelect = { selectedItem = it; showMatches = false })
+            }
+        }
+        if (showScaleDialog) {
+            IgnoreHoverWrapper {
+                ScaleDialog(
+                    onApply = { minBits, maxBits ->
+                        val minValue = BigInteger.ONE.shiftLeft(minBits - 1)
+                        val maxValue = BigInteger.ONE.shiftLeft(maxBits).subtract(BigInteger.ONE)
+                        viewModel.updateKeyspaceRange(minValue, maxValue)
+                        showScaleDialog = false
+                    },
+                    onCancel = { showScaleDialog = false }
+                )
+            }
+        }
         if (showManualScanDialog) {
-            ManualScanDialog(
-                viewModel = viewModel,
-                onDismiss = { showManualScanDialog = false },
-                onScanRequested = { direction, quantity, repeat ->
-                    viewModel.startManualScan(direction, quantity, repeat)
-                }
-            )
+            IgnoreHoverWrapper {
+                ManualScanDialog(
+                    viewModel = viewModel,
+                    onDismiss = { showManualScanDialog = false },
+                    onScanRequested = { direction, quantity, repeat ->
+                        viewModel.startManualScan(direction, quantity, repeat)
+                    }
+                )
+            }
         }
     }
 }
@@ -307,7 +322,7 @@ fun Int.toSuperscript(): String {
 
 @Composable
 fun LoadingView(modifier: Modifier = Modifier) {
-    Box(contentAlignment = Alignment.Center, modifier = modifier.fillMaxSize().background(Color.Transparent)) {
+    Box(contentAlignment = Alignment.Center, modifier = modifier.fillMaxSize().background(Color.Transparent).zIndex(4.0f)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(strokeWidth = 4.dp, modifier = Modifier.size(48.dp))
             Spacer(modifier = Modifier.height(16.dp))

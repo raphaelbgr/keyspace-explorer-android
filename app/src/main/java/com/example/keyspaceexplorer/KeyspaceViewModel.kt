@@ -152,7 +152,9 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
         }
 
         updatedBatch.filter { it.dbHit == true }.forEach {
-            MatchFetcher.saveMatch(it)
+            viewModelScope.launch(Dispatchers.IO) {
+                MatchFetcher.saveMatch(it)
+            }
             if (!StorageHelper.alreadySaved(it)) {
                 AlertHelper.alertMatch(it)
                 StorageHelper.saveMatch(it)
@@ -198,7 +200,7 @@ class KeyspaceViewModel(private val repository: KeyspaceRepository) : ViewModel(
     }
 
     private fun loadNextBatch() {
-        viewModelScope.launch(Dispatchers.Main) {
+        viewModelScope.launch(Dispatchers.Default) {
             try {
                 if (_loading.value) return@launch
                 _loading.value = true

@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.MotionEvent
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -48,7 +49,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -496,5 +499,23 @@ fun PreviewKeyDetailDialog() {
                 onDismiss = {}
             )
         }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun IgnoreHoverWrapper(content: @Composable () -> Unit) {
+    Box {
+        AndroidView(
+            modifier = Modifier.fillMaxSize().zIndex(10f),
+            factory = { context ->
+                object : FrameLayout(context) {
+                    override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {
+                        return ev.action == MotionEvent.ACTION_HOVER_EXIT || super.dispatchGenericMotionEvent(ev)
+                    }
+                }
+            }
+        )
+        content()
     }
 }
