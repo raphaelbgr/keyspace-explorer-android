@@ -81,4 +81,12 @@ class KeyspaceRepository {
             else -> address
         }
     }
+
+    fun denormalizeAddress(address: String, coin: String): String {
+        return when (coin.lowercase()) {
+            "eth" -> if (!address.startsWith("0x")) "0x${address.lowercase()}" else address.lowercase()
+            "bch" -> if (!address.startsWith("bitcoincash:")) "bitcoincash:$address" else address
+            else -> address
+        }
+    }
 }
